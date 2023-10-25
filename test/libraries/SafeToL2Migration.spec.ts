@@ -248,8 +248,11 @@ describe("SafeToL2Migration library", () => {
                 migration,
                 signers: [user1],
             } = await setupTests();
-            expect(await safe111.VERSION()).eq("1.1.1");
             const safeAddress = await safe111.getAddress();
+            expect(await safe111.VERSION()).eq("1.1.1");
+            expect("0x" + (await hre.ethers.provider.getStorage(safeAddress, FALLBACK_HANDLER_STORAGE_SLOT)).slice(26)).to.be.eq(
+                AddressZero,
+            );
 
             // The emit matcher checks the address, which is the Safe as delegatecall is used
             const migrationSafe = migration.attach(safeAddress);
@@ -294,6 +297,9 @@ describe("SafeToL2Migration library", () => {
             expect(await safe111.VERSION()).to.be.eq("1.4.1");
             const singletonResp = await user1.call({ to: safeAddress, data: migratedInterface.encodeFunctionData("masterCopy") });
             expect(migratedInterface.decodeFunctionResult("masterCopy", singletonResp)[0]).to.eq(SAFE_SINGLETON_141_L2_ADDRESS);
+            expect("0x" + (await hre.ethers.provider.getStorage(safeAddress, FALLBACK_HANDLER_STORAGE_SLOT)).slice(26)).to.be.eq(
+                COMPATIBILITY_FALLBACK_HANDLER_150.toLowerCase(),
+            );
         });
 
         it("doesn't touch important storage slots", async () => {

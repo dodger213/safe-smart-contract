@@ -17,9 +17,9 @@ interface ISafe {
 }
 
 /**
- * @title Migration Contract for updating a Safe from 1.3.0/1.4.1 version to a L2 version. Useful when replaying a Safe from a non L2 network in a L2 network.
- * @notice This contract facilitates the migration of a Safe contract from version 1.3.0 to 1.3.0L2 or from 1.4.1 to 1.4.1L2
- *         Older versions are not supported
+ * @title Migration Contract for updating a Safe from 1.1.1/1.3.0/1.4.1 versions to a L2 version. Useful when replaying a Safe from a non L2 network in a L2 network.
+ * @notice This contract facilitates the migration of a Safe contract from version 1.1.1 to 1.3.0/1.4.1 L2, 1.3.0 to 1.3.0L2 or from 1.4.1 to 1.4.1L2
+ *         Other versions are not supported
  * @dev IMPORTANT: The migration will only work with proxies that store the implementation address in the storage slot 0.
  */
 contract SafeToL2Migration is SafeStorage {
@@ -58,13 +58,25 @@ contract SafeToL2Migration is SafeStorage {
         bytes additionalInfo
     );
 
+    /**
+     * @notice Modifier to make a function callable via delegatecall only.
+     * If the function is called via a regular call, it will revert.
+     */
+    modifier onlyDelegateCall() {
+        require(address(this) != MIGRATION_SINGLETON, "Migration should only be called via delegatecall");
+        _;
+    }
+
+    /**
+     * @dev Internal function with common migration steps, changes the singleton and emits SafeMultiSigTransaction event
+     */
     function migrate(address l2Singleton, bytes memory functionData) private {
         singleton = l2Singleton;
 
         // Encode nonce, sender, threshold
         bytes memory additionalInfo = abi.encode(nonce - 1, msg.sender, threshold);
 
-        // Simulate a L2 transaction so indexer picks up the Safe
+        // Simulate a L2 transaction so Safe Tx Service indexer picks up the Safe
         emit SafeMultiSigTransaction(
             MIGRATION_SINGLETON,
             0,
@@ -87,9 +99,7 @@ contract SafeToL2Migration is SafeStorage {
      * @dev This function should only be called via a delegatecall to perform the upgrade.
      * Singletons versions will be compared, so it implies that contracts exist
      */
-    function migrateToL2(address l2Singleton) public {
-        require(address(this) != MIGRATION_SINGLETON, "Migration should only be called via delegatecall");
-
+    function migrateToL2(address l2Singleton) public onlyDelegateCall {
         require(address(singleton) != l2Singleton, "Safe is already using the singleton");
         // Nonce is increased before executing a tx, so first executed tx will have nonce=1
         require(nonce == 1, "Safe must have not executed any tx");
@@ -108,8 +118,15 @@ contract SafeToL2Migration is SafeStorage {
         migrate(l2Singleton, functionData);
     }
 
-    function migrateFromV111(address l2Singleton, address fallbackHandler) public {
-        require(address(this) != MIGRATION_SINGLETON, "Migration should only be called via delegatecall");
+    /**
+     * @notice Migrate from Safe 1.1.1 Singleton to 1.3.1 or 1.4.1 L2
+     * Safe is required to have nonce 0 so backend can support it after the migration
+     * @dev This function should only be called via a delegatecall to perform the upgrade.
+     * Singletons version will be checked, so it implies that contracts exist.
+     * A valid and compatible fallbackHandler needs to be provided, only existance will be checked.
+     */
+    function migrateFromV111(address l2Singleton, address fallbackHandler) public onlyDelegateCall {
+        require(isContract(fallbackHandler), "fallbackHandler is not a contract");
 
         bytes32 oldSingletonVersion = keccak256(abi.encodePacked(ISafe(singleton).VERSION()));
         require(oldSingletonVersion == keccak256(abi.encodePacked("1.1.1")), "Provided singleton version is not supported");
@@ -120,9 +137,10 @@ contract SafeToL2Migration is SafeStorage {
             "Provided singleton version is not supported"
         );
 
-        require(isContract(fallbackHandler), "fallbackHandler is not a contract");
         ISafe safe = ISafe(address(this));
         safe.setFallbackHandler(fallbackHandler);
+
+        // Safes < 1.3.0 did not emit SafeSetup, so Safe Tx Service backend needs the event to index the Safe
         emit SafeSetup(MIGRATION_SINGLETON, safe.getOwners(), safe.getThreshold(), address(0), fallbackHandler);
 
         // 0xd9a20812 - keccak("migrateFromV111(address,address)")
