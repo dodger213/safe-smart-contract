@@ -58,18 +58,17 @@ contract SafeToL2Migration is SafeStorage {
         bytes additionalInfo
     );
 
-    function migrate(address l2Singleton) private {
+    function migrate(address l2Singleton, bytes memory functionData) private {
         singleton = l2Singleton;
 
-        // Simulate a L2 transaction so indexer picks up the Safe
-        // 0xef2624ae - keccak("migrateToL2(address)")
-        bytes memory data = abi.encodeWithSelector(0xef2624ae, l2Singleton);
-        // nonce, sender, threshold
+        // Encode nonce, sender, threshold
         bytes memory additionalInfo = abi.encode(nonce - 1, msg.sender, threshold);
+
+        // Simulate a L2 transaction so indexer picks up the Safe
         emit SafeMultiSigTransaction(
             MIGRATION_SINGLETON,
             0,
-            data,
+            functionData,
             Enum.Operation.DelegateCall,
             0,
             0,
@@ -104,7 +103,9 @@ contract SafeToL2Migration is SafeStorage {
             "Provided singleton version is not supported"
         );
 
-        migrate(l2Singleton);
+        // 0xef2624ae - keccak("migrateToL2(address)")
+        bytes memory functionData = abi.encodeWithSelector(0xef2624ae, l2Singleton);
+        migrate(l2Singleton, functionData);
     }
 
     function migrateFromV111(address l2Singleton, address fallbackHandler) public {
@@ -123,7 +124,10 @@ contract SafeToL2Migration is SafeStorage {
         ISafe safe = ISafe(address(this));
         safe.setFallbackHandler(fallbackHandler);
         emit SafeSetup(MIGRATION_SINGLETON, safe.getOwners(), safe.getThreshold(), address(0), fallbackHandler);
-        migrate(l2Singleton);
+
+        // 0xd9a20812 - keccak("migrateFromV111(address,address)")
+        bytes memory functionData = abi.encodeWithSelector(0xd9a20812, l2Singleton, fallbackHandler);
+        migrate(l2Singleton, functionData);
     }
 
     /**

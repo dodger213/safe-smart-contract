@@ -262,11 +262,33 @@ describe("SafeToL2Migration library", () => {
             ]);
             const nonce = await safe111.nonce();
             expect(nonce).to.be.eq(0);
+            const safeThreshold = await safe111.getThreshold();
+            const additionalInfo = hre.ethers.AbiCoder.defaultAbiCoder().encode(
+                ["uint256", "address", "uint256"],
+                [0, user1.address, safeThreshold],
+            );
+
             const tx = buildSafeTransaction({ to: migrationAddress, data, operation: 1, nonce });
 
             expect(await executeTx(safe111, tx, [await safeApproveHash(user1, safe111, tx, true)]))
                 .to.emit(migrationSafe, "ChangedMasterCopy")
-                .withArgs(SAFE_SINGLETON_141_L2_ADDRESS);
+                .withArgs(SAFE_SINGLETON_141_L2_ADDRESS)
+                .to.emit(migrationSafe, "SafeMultiSigTransaction")
+                .withArgs(
+                    migrationAddress,
+                    0,
+                    data,
+                    1,
+                    0,
+                    0,
+                    0,
+                    AddressZero,
+                    AddressZero,
+                    "0x", // We cannot detect signatures
+                    additionalInfo,
+                )
+                .to.emit(migrationSafe, "SafeSetup")
+                .withArgs(migrationAddress, await safe111.getOwners(), safeThreshold, AddressZero, COMPATIBILITY_FALLBACK_HANDLER_150);
 
             expect(await safe111.nonce()).to.be.eq(1);
             expect(await safe111.VERSION()).to.be.eq("1.4.1");
