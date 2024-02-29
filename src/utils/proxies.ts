@@ -1,6 +1,6 @@
 import { ethers, BigNumberish } from "ethers";
 import hre from "hardhat";
-import * as zk from "zksync-web3";
+import * as zk from "zksync-ethers";
 import { SafeProxyFactory } from "../../typechain-types";
 
 export const calculateProxyAddress = async (factory: SafeProxyFactory, singleton: string, inititalizer: string, nonce: number | string) => {

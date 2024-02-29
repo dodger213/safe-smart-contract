@@ -44,7 +44,8 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { DeterministicDeploymentInfo } from "hardhat-deploy/dist/types";
 import { LOCAL_NODE_RICH_WALLETS } from "./src/zk-utils/constants";
 
-const primarySolidityVersion = SOLIDITY_VERSION || "0.7.6";
+const defaultSolidityVersion = "0.7.6";
+const primarySolidityVersion = SOLIDITY_VERSION || defaultSolidityVersion;
 const soliditySettings = SOLIDITY_SETTINGS ? JSON.parse(SOLIDITY_SETTINGS) : undefined;
 
 const deterministicDeployment = (network: string): DeterministicDeploymentInfo => {
@@ -52,7 +53,7 @@ const deterministicDeployment = (network: string): DeterministicDeploymentInfo =
     if (!info) {
         throw new Error(`
         Safe factory not found for network ${network}. You can request a new deployment at https://github.com/safe-global/safe-singleton-factory.
-        For more information, see https://github.com/safe-global/safe-contracts#replay-protection-eip-155
+        For more information, see https://github.com/safe-global/safe-smart-account#replay-protection-eip-155
       `);
     }
     return {
@@ -75,10 +76,10 @@ const userConfig: HardhatUserConfig = {
         target: "ethers-v6",
     },
     solidity: {
-        compilers: [{ version: primarySolidityVersion, settings: soliditySettings }, { version: "0.6.12" }, { version: "0.5.17" }],
+        compilers: [{ version: primarySolidityVersion, settings: soliditySettings }, { version: defaultSolidityVersion }],
     },
     zksolc: {
-        version: "1.3.13",
+        version: "1.4.0",
         compilerSource: "binary",
         settings: {
             isSystem: true,

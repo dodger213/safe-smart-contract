@@ -3,7 +3,7 @@ import { ContractInterface } from "ethers";
 import { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } from "hardhat/builtin-tasks/task-names";
 import { Compiler } from "hardhat/internal/solidity/compiler/downloader";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import * as zk from "zksync-web3";
+import * as zk from "zksync-ethers";
 
 export const getZkContractFactoryByName = async (hre: HardhatRuntimeEnvironment, contractName: string, signer: zk.Signer | zk.Wallet) => {
     const artifact = await hre.artifacts.readArtifact(contractName);

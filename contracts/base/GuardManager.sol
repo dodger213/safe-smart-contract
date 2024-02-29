@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+/* solhint-disable one-contract-per-file */
 pragma solidity >=0.7.0 <0.9.0;
 
-import "../common/Enum.sol";
-import "../common/SelfAuthorized.sol";
-import "../interfaces/IERC165.sol";
+import {Enum} from "../libraries/Enum.sol";
+import {SelfAuthorized} from "../common/SelfAuthorized.sol";
+import {IERC165} from "../interfaces/IERC165.sol";
+import {IGuardManager} from "../interfaces/IGuardManager.sol";
 
 /// @title Guard Interface
 interface Guard is IERC165 {
@@ -69,31 +71,19 @@ abstract contract BaseGuard is Guard {
  * @title Guard Manager - A contract managing transaction guards which perform pre and post-checks on Safe transactions.
  * @author Richard Meissner - @rmeissner
  */
-abstract contract GuardManager is SelfAuthorized {
-    event ChangedGuard(address indexed guard);
-
+abstract contract GuardManager is SelfAuthorized, IGuardManager {
     // keccak256("guard_manager.guard.address")
     bytes32 internal constant GUARD_STORAGE_SLOT = 0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8;
 
-    /**
-     * @dev Set a guard that checks transactions before execution
-     *      This can only be done via a Safe transaction.
-     *      ⚠️ IMPORTANT: Since a guard has full power to block Safe transaction execution,
-     *        a broken guard can cause a denial of service for the Safe. Make sure to carefully
-     *        audit the guard code and design recovery mechanisms.
-     * @notice Set Transaction Guard `guard` for the Safe. Make sure you trust the guard.
-     * @param guard The address of the guard to be used or the 0 address to disable the guard
-     */
-    function setGuard(address guard) external authorized {
-        if (guard != address(0)) {
-            require(Guard(guard).supportsInterface(type(Guard).interfaceId), "GS300");
-        }
-        bytes32 slot = GUARD_STORAGE_SLOT;
-        // solhint-disable-next-line no-inline-assembly
+    // @inheritdoc IGuardManager
+    function setGuard(address guard) external override authorized {
+        if (guard != address(0) && !Guard(guard).supportsInterface(type(Guard).interfaceId)) revertWithError("GS300");
+        /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
         assembly {
-            sstore(slot, guard)
+            sstore(GUARD_STORAGE_SLOT, guard)
         }
+        /* solhint-enable no-inline-assembly */
         emit ChangedGuard(guard);
     }
 
@@ -105,11 +95,11 @@ abstract contract GuardManager is SelfAuthorized {
      * @return guard The address of the guard
      */
     function getGuard() internal view returns (address guard) {
-        bytes32 slot = GUARD_STORAGE_SLOT;
-        // solhint-disable-next-line no-inline-assembly
+        /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
         assembly {
-            guard := sload(slot)
+            guard := sload(GUARD_STORAGE_SLOT)
         }
+        /* solhint-enable no-inline-assembly */
     }
 }

@@ -1,61 +1,76 @@
-name: safe-contracts
+name: safe-smart-account
 on: [push, pull_request]
+env:
+    NODE_VERSION: 18.17.1
 
 jobs:
-    tests:
+    lint-solidity:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2
             - uses: actions/setup-node@v2
               with:
-                  node-version: 18.17.1
-                  cache: 'npm'
-            - run: npm ci 
-            - run: npm run build
-            - run: npm run coverage
-            - name: Coveralls
-              uses: coverallsapp/github-action@master
-              with:
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
-    lint:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v2
-              with:
-                  node-version: 18.17.1
-                  cache: 'npm'
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
             - run: npm ci
-            - run: npm run lint:sol && npm run lint:ts && npm run lint:sol:prettier
-    tests-other:
+            - run: npm run lint:sol:prettier
+            - run: npm run lint:sol
+
+    lint-typescript:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+            - uses: actions/setup-node@v2
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+            - run: npm ci
+            - run: npm run lint:ts:prettier
+            - run: npm run lint:ts
+
+    tests:
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
             matrix:
-                contract-name: ["SafeL2"]
+                contract-name: ["Safe", "SafeL2"]
         env:
             SAFE_CONTRACT_UNDER_TEST: ${{ matrix.contract-name }}
         steps:
             - uses: actions/checkout@v2
             - uses: actions/setup-node@v2
               with:
-                  node-version: 18.17.1
-                  cache: 'npm'
-            - run: npm ci 
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+            - run: npm ci
             - run: npm run build
             - run: npm run coverage
-            - name: Coveralls
-              uses: coverallsapp/github-action@master
+            - name: Send coverage to Coveralls (parallel)
+              uses: coverallsapp/github-action@v2
               with:
+                  parallel: true
+                  flag-name: run-$
                   github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    finish:
+        runs-on: ubuntu-latest
+        needs: tests
+        if: ${{ always() }}
+        steps:
+            - name: Coveralls Finished
+              uses: coverallsapp/github-action@v2
+              with:
+                  parallel-finished: true
+                  carryforward: "run-Safe,run-SafeL2"
+
     benchmarks:
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
             matrix:
-                solidity: ["0.7.6", "0.8.19"]
+                solidity: ["0.7.6", "0.8.24"]
                 include:
-                    - solidity: "0.8.19"
+                    - solidity: "0.8.24"
                       settings: '{"viaIR":true,"optimizer":{"enabled":true,"runs":1000000}}'
         env:
             SOLIDITY_VERSION: ${{ matrix.solidity }}
@@ -64,6 +79,6 @@ jobs:
             - uses: actions/checkout@v2
             - uses: actions/setup-node@v2
               with:
-                  node-version: 18.17.1
-                  cache: 'npm'
-            - run: (npm ci && npm run build && npx hardhat codesize --contractname Safe && npm run benchmark) || echo "Benchmark failed"
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: "npm"
+            - run: npm ci && npm run build && npx hardhat codesize --contractname Safe && npm run benchmark

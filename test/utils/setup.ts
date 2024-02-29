@@ -2,7 +2,7 @@ import hre, { deployments } from "hardhat";
 import { Contract, Signer, ethers } from "ethers";
 import { AddressZero } from "@ethersproject/constants";
 import solc from "solc";
-import * as zk from "zksync-web3";
+import * as zk from "zksync-ethers";
 import { logGas } from "../../src/utils/execution";
 import { safeContractUnderTest } from "./config";
 import { getZkContractFactoryByName, zkCompile } from "./zk";
@@ -101,6 +101,14 @@ export const migrationContract = async () => {
     return await getContractFactoryByName("Migration");
 };
 
+export const migrationContractTo150 = async () => {
+    return await hre.ethers.getContractFactory("Safe150Migration");
+};
+
+export const migrationContractFrom130To141 = async () => {
+    return await hre.ethers.getContractFactory("Safe130To141Migration");
+};
+
 export const getMock = async () => {
     const contractFactory = await getContractFactoryByName("MockContract");
     const contract = await contractFactory.deploy();
@@ -109,7 +117,8 @@ export const getMock = async () => {
 
 export const getContractFactoryByName = async (contractName: string) => {
     if (hre.network.zksync) {
-        return getZkContractFactoryByName(hre, contractName, getWallets()[0] as zk.Wallet);
+        const signers = await getWallets();
+        return getZkContractFactoryByName(hre, contractName, signers[0] as zk.Wallet);
     } else {
         return hre.ethers.getContractFactory(contractName);
     }
@@ -139,6 +148,32 @@ export const getSafeWithOwners = async (
         !logGasUsage,
     );
     return template;
+};
+
+export const getSafeWithSingleton = async (
+    singleton: Safe | SafeL2,
+    owners: string[],
+    threshold?: number,
+    fallbackHandler?: string,
+    saltNumber: string = getRandomIntAsString(),
+) => {
+    const factory = await getFactory();
+    const singletonAddress = await singleton.getAddress();
+    const template = await factory.createProxyWithNonce.staticCall(singletonAddress, "0x", saltNumber);
+    await factory.createProxyWithNonce(singletonAddress, "0x", saltNumber).then((tx: any) => tx.wait());
+    const safeProxy = singleton.attach(template) as Safe | SafeL2;
+    await safeProxy.setup(
+        owners,
+        threshold || owners.length,
+        AddressZero,
+        "0x",
+        fallbackHandler || AddressZero,
+        AddressZero,
+        0,
+        AddressZero,
+    );
+
+    return safeProxy;
 };
 
 export const getTokenCallbackHandler = async (address?: string) => {
@@ -215,18 +250,17 @@ export const deployContract = async (deployer: Signer, source: string): Promise<
         return new Contract(receipt.contractAddress, output.interface, deployer);
     } else {
         const output = await zkCompile(hre, source);
-
-        const factory = new zk.ContractFactory(output.abi, output.data, getWallets()[0] as zk.Wallet, "create");
+        const signers = await getWallets();
+        const factory = new zk.ContractFactory(output.abi, output.data, signers[0] as zk.Wallet, "create");
         // Encode and send the deploy transaction providing factory dependencies.
         const contract = await factory.deploy();
-        await contract.deployed();
 
         return contract;
     }
 };
 
-export const getWallets = async (): (ethers.Signer | zk.Wallet)[] => {
-    if (hre.network.name === "hardhat") return ethers.getSigners();
+export const getWallets = async (): Promise<(ethers.Signer | zk.Wallet)[]> => {
+    if (hre.network.name === "hardhat") return hre.ethers.getSigners();
     if (!hre.network.zksync) throw new Error("You can get wallets only on Hardhat or ZkSyncLocal networks!");
 
     const { accounts } = hre.network.config;

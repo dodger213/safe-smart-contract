@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+/* solhint-disable one-contract-per-file */
 pragma solidity >=0.7.0 <0.9.0;
 
-import "../../common/Enum.sol";
-import "../../base/GuardManager.sol";
-import "../../Safe.sol";
-
-interface ISafe {
-    function getOwners() external view returns (address[] memory);
-}
+import {Enum} from "../../libraries/Enum.sol";
+import {BaseGuard} from "../../base/GuardManager.sol";
+import {ISafe} from "../../interfaces/ISafe.sol";
 
 /**
  * @title OnlyOwnersGuard - Only allows owners to execute transactions.
  * @author Richard Meissner - @rmeissner
  */
 contract OnlyOwnersGuard is BaseGuard {
-    ISafe public safe;
-
     constructor() {}
 
     // solhint-disable-next-line payable-fallback
@@ -43,16 +38,7 @@ contract OnlyOwnersGuard is BaseGuard {
         bytes memory,
         address msgSender
     ) external view override {
-        // Only owners can exec
-        address[] memory owners = ISafe(msg.sender).getOwners();
-        for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] == msgSender) {
-                return;
-            }
-        }
-
-        // msg sender is not an owner
-        revert("msg sender is not allowed to exec");
+        require(ISafe(msg.sender).isOwner(msgSender), "msg sender is not allowed to exec");
     }
 
     function checkAfterExecution(bytes32, bool) external view override {}

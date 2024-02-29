@@ -3,6 +3,7 @@ methods {
     function disableModule(address,address) external;
     function nonce() external returns (uint256) envfree;
     function signedMessages(bytes32) external returns (uint256) envfree;
+    function isOwner(address) external returns (bool) envfree;
 
     // harnessed
     function getModule(address) external returns (address) envfree;
@@ -15,12 +16,9 @@ methods {
     function execTransactionFromModuleReturnData(address,uint256,bytes,Enum.Operation) external returns (bool, bytes memory);
     function execTransactionFromModule(address,uint256,bytes,Enum.Operation) external returns (bool);
     function execTransaction(address,uint256,bytes,Enum.Operation,uint256,uint256,uint256,address,address,bytes) external returns (bool);
-}
 
-definition noHavoc(method f) returns bool =
-    f.selector != sig:execTransactionFromModuleReturnData(address,uint256,bytes,Enum.Operation).selector
-    && f.selector != sig:execTransactionFromModule(address,uint256,bytes,Enum.Operation).selector 
-    && f.selector != sig:execTransaction(address,uint256,bytes,Enum.Operation,uint256,uint256,uint256,address,address,bytes).selector;
+    function checkSignatures(bytes32, bytes memory) internal => NONDET;
+}
 
 definition reachableOnly(method f) returns bool =
     f.selector != sig:setup(address[],uint256,address,bytes,address,address,uint256,address).selector
@@ -30,7 +28,7 @@ definition reachableOnly(method f) returns bool =
     // "If it’s called from an internal context it is fine but as a public function that can be called with any argument it cannot have hooks applied on."
     && f.selector != sig:getStorageAt(uint256,uint256).selector;
 
-definition MAX_UINT256() returns uint256 = 0xffffffffffffffffffffffffffffffff;
+definition MAX_UINT256() returns uint256 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
 /// Nonce must never decrease
 rule nonceMonotonicity(method f) filtered {
@@ -46,13 +44,13 @@ rule nonceMonotonicity(method f) filtered {
 
     uint256 nonceAfter = nonce();
 
-    assert nonceAfter != nonceBefore => 
+    assert nonceAfter != nonceBefore =>
         to_mathint(nonceAfter) == nonceBefore + 1 && f.selector == sig:execTransaction(address,uint256,bytes,Enum.Operation,uint256,uint256,uint256,address,address,bytes).selector;
 }
 
 
 // The singleton is a private variable, so we need to use a ghost variable to track it.
-ghost address ghostSingletonAddress {
+persistent ghost address ghostSingletonAddress {
     init_state axiom ghostSingletonAddress == 0;
 }
 
@@ -67,11 +65,11 @@ hook Sstore SafeHarness.(slot 24440054405305269366569402256811496959409073762505
     ghostSingletonAddress = newSingletonAddress;
 }
 
-invariant sigletonAddressNeverChanges()
+invariant singletonAddressNeverChanges()
     ghostSingletonAddress == 0
     filtered { f -> reachableOnly(f) && f.selector != sig:getStorageAt(uint256,uint256).selector }
 
-ghost address fallbackHandlerAddress {
+persistent ghost address fallbackHandlerAddress {
     init_state axiom fallbackHandlerAddress == 0;
 }
 
@@ -95,6 +93,40 @@ rule fallbackHandlerAddressChange(method f) filtered {
 
     assert fbHandlerBefore != fbHandlerAfter =>
         f.selector == sig:setup(address[],uint256,address,bytes,address,address,uint256,address).selector || f.selector == sig:setFallbackHandler(address).selector;
+}
+
+rule setFallbackHandlerUpdatesFallbackHandler(address newFallbackHandler) {
+    address fbHandlerBefore = fallbackHandlerAddress;
+    env e;
+
+    setFallbackHandler(e, newFallbackHandler);
+
+    address fbHandlerAfter = fallbackHandlerAddress;
+
+    assert fbHandlerBefore != fbHandlerAfter => fbHandlerAfter == newFallbackHandler;
+}
+
+rule setupCorrectlyConfiguresSafe(
+    address[] owners,
+    uint256 threshold, 
+    address fallbackHandler,
+    address to, bytes data, 
+    address paymentToken, 
+    uint256 payment, 
+    address paymentReceiver
+) {
+    env e;
+
+    require fallbackHandler != 0;
+    uint256 index;
+    require index < owners.length;
+
+    setup(e, owners, threshold, to, data, fallbackHandler, paymentToken, payment, paymentReceiver);
+
+    assert getThreshold() == threshold, "Threshold not set correctly";
+    assert fallbackHandlerAddress == fallbackHandler, "Fallback handler not set correctly";
+    assert getOwnersCount() == owners.length, "Owners count not set correctly";
+    assert isOwner(owners[index]), "Owners not set correctly";
 }
 
 
@@ -127,11 +159,12 @@ rule nativeTokenBalanceSpending(method f) filtered {
 
     uint256 balanceAfter = getNativeTokenBalance();
 
-    assert balanceAfter < balanceBefore => 
+    assert balanceAfter < balanceBefore =>
         f.selector == sig:execTransaction(address,uint256,bytes,Enum.Operation,uint256,uint256,uint256,address,address,bytes).selector
         || f.selector == sig:execTransactionFromModule(address,uint256,bytes,Enum.Operation).selector
         || f.selector == sig:execTransactionFromModuleReturnData(address,uint256,bytes,Enum.Operation).selector;
 }
+
 
 rule nativeTokenBalanceSpendingExecTransaction(
         address to,
@@ -139,10 +172,10 @@ rule nativeTokenBalanceSpendingExecTransaction(
         bytes data,
         Enum.Operation operation,
         uint256 safeTxGas,
-        uint256 baseGas, 
-        uint256 gasPrice, 
-        address gasToken, 
-        address refundReceiver, 
+        uint256 baseGas,
+        uint256 gasPrice,
+        address gasToken,
+        address refundReceiver,
         bytes signatures
     ) {
     uint256 balanceBefore = getNativeTokenBalance();
@@ -152,7 +185,7 @@ rule nativeTokenBalanceSpendingExecTransaction(
 
     uint256 balanceAfter = getNativeTokenBalance();
 
-    assert 
+    assert
         gasPrice == 0 => to_mathint(balanceBefore - value) <= to_mathint(balanceAfter)
         // When the gas price is non-zero and the gas token is zero (zero = native token), the refund params should also be taken into account.
         || gasPrice > 0 && gasToken == 0 => to_mathint(balanceBefore - value - (gasPrice * (baseGas + safeTxGas))) <= to_mathint(balanceAfter);
@@ -171,7 +204,7 @@ rule nativeTokenBalanceSpendingExecTransactionFromModule(
 
     uint256 balanceAfter = getNativeTokenBalance();
 
-    assert balanceAfter < balanceBefore => 
+    assert balanceAfter < balanceBefore =>
         to_mathint(balanceBefore - value) <= to_mathint(balanceAfter);
 }
 
@@ -189,7 +222,7 @@ rule nativeTokenBalanceSpendingExecTransactionFromModuleReturnData(
 
     uint256 balanceAfter = getNativeTokenBalance();
 
-    assert balanceAfter < balanceBefore => 
+    assert balanceAfter < balanceBefore =>
         to_mathint(balanceBefore - value) <= to_mathint(balanceAfter);
 }
 
@@ -210,9 +243,10 @@ rule moduleOnlyAddedThroughEnableModule(method f, address module) filtered {
     calldataarg args; env e;
     f(e, args);
 
-    assert getModule(module) != 0 => 
+    assert getModule(module) != 0 =>
         f.selector == sig:enableModule(address).selector;
 }
+
 
 rule onlyModuleCanExecuteModuleThransactions(
     address to,
