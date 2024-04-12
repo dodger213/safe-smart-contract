@@ -28,6 +28,8 @@ contract SafeL2 is Safe {
 
     event SafeModuleTransaction(address module, address to, uint256 value, bytes data, Enum.Operation operation);
 
+    constructor() Safe(address(0)) {}
+
     // @inheritdoc Safe
     function execTransaction(
         address to,

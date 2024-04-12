@@ -13,10 +13,11 @@ describe("Safe", async () => {
     const [user1, user2, user3] = waffle.provider.getWallets();
 
     const setupTests = deployments.createFixture(async ({ deployments }) => {
-        await deployments.fixture();
+        const { SafeFallbackHandler } = await deployments.fixture();
         return {
             template: await getSafeTemplate(),
             mock: await getMock(),
+            handler: SafeFallbackHandler.address,
         };
     });
 
@@ -50,21 +51,21 @@ describe("Safe", async () => {
         });
 
         it("should set domain hash", async () => {
-            const { template } = await setupTests();
+            const { template, handler } = await setupTests();
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
                     2,
                     AddressZero,
                     "0x",
-                    AddressZero,
+                    handler,
                     AddressZero,
                     0,
                     AddressZero,
                 ),
             )
                 .to.emit(template, "SafeSetup")
-                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, AddressZero, AddressZero);
+                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, AddressZero, handler);
             await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(template, await chainId()));
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
             await expect(await template.getThreshold()).to.be.deep.eq(BigNumber.from(2));
@@ -137,7 +138,7 @@ describe("Safe", async () => {
             const { template } = await setupTests();
             await expect(
                 template.setup([user2.address, user2.address], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
-            ).to.be.revertedWith("GS203");
+            ).to.be.revertedWith("GS204");
         });
 
         it("should revert if threshold is too high", async () => {
@@ -178,7 +179,7 @@ describe("Safe", async () => {
         });
 
         it("should set fallback handler and call sub inititalizer", async () => {
-            const { template } = await setupTests();
+            const { template, handler } = await setupTests();
             const source = `
             contract Initializer {
                 function init(bytes4 data) public {
@@ -197,14 +198,14 @@ describe("Safe", async () => {
                     2,
                     testIntializer.address,
                     initData,
-                    AddressOne,
+                    handler,
                     AddressZero,
                     0,
                     AddressZero,
                 ),
             )
                 .to.emit(template, "SafeSetup")
-                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, testIntializer.address, AddressOne);
+                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, testIntializer.address, handler);
             await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(template, await chainId()));
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
             await expect(await template.getThreshold()).to.be.deep.eq(BigNumber.from(2));
@@ -214,7 +215,7 @@ describe("Safe", async () => {
                     template.address,
                     "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5",
                 ),
-            ).to.be.eq("0x" + "1".padStart(64, "0"));
+            ).to.be.eq(hre.ethers.utils.hexZeroPad(handler.toLowerCase(), 32));
 
             await expect(
                 await hre.ethers.provider.getStorageAt(
@@ -269,7 +270,7 @@ describe("Safe", async () => {
         });
 
         it("should work with ether payment to deployer", async () => {
-            const { template } = await setupTests();
+            const { template, handler } = await setupTests();
             const payment = parseEther("10");
             await user1.sendTransaction({ to: template.address, value: payment });
             const userBalance = await hre.ethers.provider.getBalance(user1.address);
@@ -280,7 +281,7 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 AddressZero,
                 payment,
                 AddressZero,
@@ -291,7 +292,7 @@ describe("Safe", async () => {
         });
 
         it("should work with ether payment to account", async () => {
-            const { template } = await setupTests();
+            const { template, handler } = await setupTests();
             const payment = parseEther("10");
             await user1.sendTransaction({ to: template.address, value: payment });
             const userBalance = await hre.ethers.provider.getBalance(user2.address);
@@ -302,7 +303,7 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 AddressZero,
                 payment,
                 user2.address,
@@ -335,7 +336,7 @@ describe("Safe", async () => {
         });
 
         it("should work with token payment to deployer", async () => {
-            const { template, mock } = await setupTests();
+            const { template, mock, handler } = await setupTests();
             const payment = 133742;
 
             const transferData = encodeTransfer(user1.address, payment);
@@ -345,7 +346,7 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 mock.address,
                 payment,
                 AddressZero,
@@ -357,7 +358,7 @@ describe("Safe", async () => {
         });
 
         it("should work with token payment to account", async () => {
-            const { template, mock } = await setupTests();
+            const { template, mock, handler } = await setupTests();
             const payment = 133742;
 
             const transferData = encodeTransfer(user2.address, payment);
@@ -367,7 +368,7 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 mock.address,
                 payment,
                 user2.address,

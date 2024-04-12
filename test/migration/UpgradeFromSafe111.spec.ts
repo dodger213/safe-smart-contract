@@ -15,7 +15,7 @@ describe("Upgrade from Safe 1.1.1", () => {
 
     // We migrate the Safe and run the verification tests
     const setupTests = deployments.createFixture(async ({ deployments }) => {
-        await deployments.fixture();
+        const { SafeFallbackHandler } = await deployments.fixture();
         const mock = await getMock();
         const singleton111 = (await (await user1.sendTransaction({ data: deploymentData.safe111 })).wait()).contractAddress;
         const singleton140 = (await getSafeSingleton()).address;
@@ -39,6 +39,7 @@ describe("Upgrade from Safe 1.1.1", () => {
             migratedSafe: safe,
             mock,
             multiSend: await getMultiSend(),
+            handler: SafeFallbackHandler.address,
         };
     });
     verificationTests(setupTests);

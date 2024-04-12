@@ -17,3 +17,6 @@ yarn-error.log
 .certora_internal
 .certora_recent_jobs.json
 .zip-output-url.txt
+
+# Safe YUL code
+contracts/SafeBytecode.sol

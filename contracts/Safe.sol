@@ -13,6 +13,8 @@ import "./common/StorageAccessible.sol";
 import "./interfaces/ISignatureValidator.sol";
 import "./external/SafeMath.sol";
 
+import "./SafeBytecode.sol";
+
 /**
  * @title Safe - A multisignature wallet with support for confirmations using signed messages based on EIP-712.
  * @dev Most important concepts:
@@ -70,13 +72,24 @@ contract Safe is
     mapping(address => mapping(bytes32 => uint256)) public approvedHashes;
 
     // This constructor ensures that this contract can only be used as a singleton for Proxy contracts
-    constructor() {
+    constructor(address byteCode) {
         /**
          * By setting the threshold it is not possible to call setup anymore,
          * so we create a Safe with 0 owners and threshold 1.
          * This is an unusable Safe, perfect for the singleton
          */
         threshold = 1;
+
+        if (byteCode != address(0)) {
+            bytes memory code = SafeBytecode(byteCode).DEPLOYED_BYTECODE();
+
+            /* solhint-disable no-inline-assembly */
+            /// @solidity memory-safe-assembly
+            assembly {
+                return(add(code, 32), mload(code))
+            }
+            /* solhint-enable no-inline-assembly */
+        }
     }
 
     /**

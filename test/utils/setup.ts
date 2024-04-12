@@ -98,7 +98,7 @@ export const getSafeWithOwners = async (
     const template = await getSafeTemplate(saltNumber);
     await logGas(
         `Setup Safe with ${owners.length} owner(s)${fallbackHandler && fallbackHandler !== AddressZero ? " and fallback handler" : ""}`,
-        template.setup(owners, threshold || owners.length, AddressZero, "0x", fallbackHandler || AddressZero, AddressZero, 0, AddressZero),
+        template.setup(owners, threshold || owners.length, AddressZero, "0x", fallbackHandler || (await deployments.get("SafeFallbackHandler")).address, AddressZero, 0, AddressZero),
         !logGasUsage,
     );
     return template;
