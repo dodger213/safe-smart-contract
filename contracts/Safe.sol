@@ -75,7 +75,9 @@ contract Safe is
         threshold = 1;
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function setup(
         address[] calldata _owners,
         uint256 _threshold,
@@ -100,7 +102,9 @@ contract Safe is
         emit SafeSetup(msg.sender, _owners, _threshold, to, fallbackHandler);
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function execTransaction(
         address to,
         uint256 value,
@@ -162,7 +166,7 @@ contract Safe is
         {
             uint256 gasUsed = gasleft();
             // If the gasPrice is 0 we assume that nearly all available gas can be used (it is always more than safeTxGas)
-            // We only substract 2500 (compared to the 3000 before) to ensure that the amount passed is still higher than safeTxGas
+            // We only subtract 2500 (compared to the 3000 before) to ensure that the amount passed is still higher than safeTxGas
             success = execute(to, value, data, operation, gasPrice == 0 ? (gasleft() - 2500) : safeTxGas);
             gasUsed = gasUsed.sub(gasleft());
             // If no safeTxGas and no gasPrice was set (e.g. both are 0), then the internal tx is required to be successful
@@ -247,13 +251,10 @@ contract Safe is
         if (ISignatureValidator(owner).isValidSignature(dataHash, contractSignature) != EIP1271_MAGIC_VALUE) revertWithError("GS024");
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function checkSignatures(bytes32 dataHash, bytes memory signatures) public view override {
-        checkSignatures(dataHash, "", signatures);
-    }
-
-    // @inheritdoc ISafe
-    function checkSignatures(bytes32 dataHash, bytes memory /* IGNORED */, bytes memory signatures) public view override {
         // Load threshold to avoid multiple storage loads
         uint256 _threshold = threshold;
         // Check that a threshold is set
@@ -261,7 +262,9 @@ contract Safe is
         checkNSignatures(msg.sender, dataHash, signatures, _threshold);
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function checkNSignatures(
         address executor,
         bytes32 dataHash,
@@ -315,14 +318,49 @@ contract Safe is
         }
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @notice Checks whether the signature provided is valid for the provided hash. Reverts otherwise.
+     *         The `data` parameter is completely ignored during signature verification.
+     * @dev This function is provided for compatibility with previous versions.
+     *      Use `checkSignatures(bytes32,bytes)` instead.
+     * @param dataHash Hash of the data (could be either a message hash or transaction hash).
+     * @param data **IGNORED** The data pre-image.
+     * @param signatures Signature data that should be verified.
+     *                   Can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
+     */
+    function checkSignatures(bytes32 dataHash, bytes calldata data, bytes memory signatures) external view {
+        data;
+        checkSignatures(dataHash, signatures);
+    }
+
+    /**
+     * @notice Checks whether the signature provided is valid for the provided hash. Reverts otherwise.
+     *         The `data` parameter is completely ignored during signature verification.
+     * @dev This function is provided for compatibility with previous versions.
+     *      Use `checkNSignatures(address,bytes32,bytes,uint256)` instead.
+     * @param dataHash Hash of the data (could be either a message hash or transaction hash)
+     * @param data **IGNORED** The data pre-image.
+     * @param signatures Signature data that should be verified.
+     *                   Can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
+     * @param requiredSignatures Amount of required valid signatures.
+     */
+    function checkNSignatures(bytes32 dataHash, bytes calldata data, bytes memory signatures, uint256 requiredSignatures) external view {
+        data;
+        checkNSignatures(msg.sender, dataHash, signatures, requiredSignatures);
+    }
+
+    /**
+     * @inheritdoc ISafe
+     */
     function approveHash(bytes32 hashToApprove) external override {
         if (owners[msg.sender] == address(0)) revertWithError("GS030");
         approvedHashes[msg.sender][hashToApprove] = 1;
         emit ApproveHash(hashToApprove, msg.sender);
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function domainSeparator() public view override returns (bytes32) {
         uint256 chainId;
         /* solhint-disable no-inline-assembly */
@@ -379,7 +417,9 @@ contract Safe is
         return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator(), safeTxHash);
     }
 
-    // @inheritdoc ISafe
+    /**
+     * @inheritdoc ISafe
+     */
     function getTransactionHash(
         address to,
         uint256 value,
