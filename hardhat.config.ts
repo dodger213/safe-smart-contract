@@ -43,7 +43,6 @@ import "./src/tasks/show_codesize";
 import "./src/tasks/zk";
 import { BigNumber } from "@ethersproject/bignumber";
 import { DeterministicDeploymentInfo } from "hardhat-deploy/dist/types";
-import { LOCAL_NODE_RICH_WALLETS } from "./src/zk-utils/constants";
 
 const defaultSolidityVersion = "0.7.6";
 const primarySolidityVersion = SOLIDITY_VERSION || defaultSolidityVersion;
@@ -144,7 +143,6 @@ const userConfig: HardhatUserConfig = {
         },
         zkSyncLocal: {
             chainId: 270,
-            accounts: LOCAL_NODE_RICH_WALLETS.map((account) => account.privateKey),
             url: "http://localhost:3050",
             ethNetwork: "http://localhost:8545",
             zksync: true,

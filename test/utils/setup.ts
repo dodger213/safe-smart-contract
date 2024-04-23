@@ -259,28 +259,9 @@ export const deployContract = async (deployer: Signer, source: string): Promise<
     }
 };
 
-export const getWallets = async (): Promise<(ethers.Signer | zk.Wallet)[]> => {
+export const getWallets = async () => {
     if (hre.network.name === "hardhat") return hre.ethers.getSigners();
-    if (!hre.network.zksync) throw new Error("You can get wallets only on Hardhat or ZkSyncLocal networks!");
+    if (hre.network.zksync) return hre.zksyncEthers.getWallets();
 
-    const { accounts } = hre.network.config;
-
-    if (typeof accounts === "string") throw new Error("Unsupported accounts config");
-
-    const zkProvider = zk.Provider.getDefaultProvider();
-    if (Array.isArray(accounts)) {
-        const wallets = [];
-
-        for (const account of accounts) {
-            if (typeof account === "string") {
-                wallets.push(new zk.Wallet(account).connect(zkProvider));
-            } else if (typeof account === "object" && "privateKey" in account) {
-                wallets.push(new zk.Wallet(account.privateKey).connect(zkProvider));
-            }
-        }
-
-        return wallets;
-    } else {
-        throw new Error("Unsupported accounts config");
-    }
+    throw new Error("You can get wallets only on Hardhat or ZkSyncLocal networks!");
 };
