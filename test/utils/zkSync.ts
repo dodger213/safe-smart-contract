@@ -48,7 +48,7 @@ export async function zkCompile(
             {
                 maxBuffer: 1024 * 1024 * 500,
             },
-            (err, stdout, _stderr) => {
+            (err, stdout) => {
                 if (err !== null) {
                     return reject(err);
                 }

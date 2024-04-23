@@ -1,6 +1,6 @@
 import { signHash } from "./../../src/utils/execution";
 import { expect } from "chai";
-import hre, { ethers } from "hardhat";
+import hre from "hardhat";
 import { getContractFactoryByName, getMock, getSafeWithOwners, getWallets } from "../utils/setup";
 import { buildSafeTransaction, calculateSafeTransactionHash, executeContractCallWithSigners, executeTx } from "../../src/utils/execution";
 import { chainId } from "../utils/encoding";

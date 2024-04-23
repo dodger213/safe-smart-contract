@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import hre, { ethers } from "hardhat";
+import hre from "hardhat";
 import { getContractFactoryByName, getMock, getSafeWithOwners, getWallets } from "../utils/setup";
 import {
     buildSafeTransaction,
@@ -101,10 +101,12 @@ describe("ReentrancyTransactionGuard", () => {
             const {
                 safe,
                 mock,
+                guard,
                 signers: [user1],
             } = await setupTests();
             const mockAddress = await mock.getAddress();
             const safeAddress = await safe.getAddress();
+            const guardAddress = await guard.getAddress();
             const nonce = await safe.nonce();
             const safeTx = buildSafeTransaction({ to: mockAddress, data: "0xbaddad42", nonce: nonce + 1n });
             const signatures = [await safeSignTypedData(user1, safeAddress, safeTx)];

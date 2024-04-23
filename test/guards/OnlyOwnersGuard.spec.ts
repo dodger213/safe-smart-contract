@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import hre, { ethers } from "hardhat";
+import hre from "hardhat";
 import { getContractFactoryByName, getMock, getSafeWithOwners, getWallets } from "../utils/setup";
 import {
     buildSafeTransaction,

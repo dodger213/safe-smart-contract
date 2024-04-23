@@ -2,14 +2,14 @@ import { expect } from "chai";
 import hre from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
 import { defaultTokenCallbackHandlerDeployment, getContractFactoryByName, getSafeTemplate, getWallets } from "../utils/setup";
+import { ERC1155Token } from "../../typechain-types";
 
 describe("Safe", () => {
     const setupWithTemplate = hre.deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
         const signers = await getWallets();
 
-        const mockErc1155 = await (await getContractFactoryByName("ERC1155Token")).deploy();
-        await mockErc1155.deployed();
+        const mockErc1155 = (await (await getContractFactoryByName("ERC1155Token")).deploy()) as ERC1155Token;
 
         return {
             safe: await getSafeTemplate(),

@@ -1,4 +1,4 @@
-import { getCompatFallbackHandler, getWallets } from "./../utils/setup";
+import { getCompatFallbackHandler } from "./../utils/setup";
 import { calculateSafeMessageHash, signHash, buildContractSignature } from "./../../src/utils/execution";
 import { expect } from "chai";
 import hre, { ethers } from "hardhat";
@@ -19,7 +19,7 @@ import {
 import { chainId } from "../utils/encoding";
 
 describe("Safe", () => {
-    const setupTests = deployments.createFixture(async ({ deployments }) => {
+    const setupTests = hre.deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
         const compatFallbackHandler = await getCompatFallbackHandler();
         const signers = await ethers.getSigners();

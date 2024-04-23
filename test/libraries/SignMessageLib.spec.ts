@@ -1,13 +1,13 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { getContractFactoryByName, getSafeWithOwners, getWallets } from "../utils/setup";
+import { getSafeWithOwners, getSignMessageLib, getWallets } from "../utils/setup";
 import { executeContractCallWithSigners, calculateSafeMessageHash } from "../../src/utils/execution";
 import { chainId } from "../utils/encoding";
 
 describe("SignMessageLib", () => {
     const setupTests = hre.deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
-        const lib = await (await getContractFactoryByName("SignMessageLib")).deploy();
+        const lib = await getSignMessageLib();
         const signers = await getWallets();
         const [user1, user2] = signers;
         return {

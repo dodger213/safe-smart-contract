@@ -5,7 +5,7 @@ import { getTokenCallbackHandler } from "../utils/setup";
 
 describe("TokenCallbackHandler", () => {
     beforeEach(async () => {
-        await hre.deployments.fixture();
+        await deployments.fixture();
     });
 
     describe("ERC1155", () => {

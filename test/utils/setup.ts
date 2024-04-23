@@ -7,7 +7,7 @@ import { logGas } from "../../src/utils/execution";
 import { safeContractUnderTest } from "./config";
 import { zkCompile } from "./zkSync";
 import { getRandomIntAsString } from "./numbers";
-import { Safe, SafeL2 } from "../../typechain-types";
+import { DelegateCaller, Migration__factory, MockContract, MockContract__factory, Safe, SafeL2 } from "../../typechain-types";
 
 export const defaultTokenCallbackHandlerDeployment = async () => {
     return deployments.get("TokenCallbackHandler");
@@ -98,7 +98,7 @@ export const getCreateCall = async () => {
 };
 
 export const migrationContract = async () => {
-    return await getContractFactoryByName("Migration");
+    return (await getContractFactoryByName("Migration")) as Migration__factory;
 };
 
 export const migrationContractTo150 = async () => {
@@ -109,8 +109,8 @@ export const migrationContractFrom130To141 = async () => {
     return await hre.ethers.getContractFactory("Safe130To141Migration");
 };
 
-export const getMock = async () => {
-    const contractFactory = await getContractFactoryByName("MockContract");
+export const getMock = async (): Promise<MockContract> => {
+    const contractFactory = (await getContractFactoryByName("MockContract")) as unknown as MockContract__factory;
     const contract = await contractFactory.deploy();
 
     return contract;
@@ -194,7 +194,7 @@ export const getCompatFallbackHandler = async (address?: string) => {
     return fallbackHandler;
 };
 
-export const getSafeProxyRuntimeCode = async () => {
+export const getSafeProxyRuntimeCode = async (): Promise<string> => {
     const proxyArtifact = await hre.artifacts.readArtifact("SafeProxy");
 
     return proxyArtifact.deployedBytecode;
@@ -202,7 +202,7 @@ export const getSafeProxyRuntimeCode = async () => {
 
 export const getDelegateCaller = async () => {
     const DelegateCaller = await getContractFactoryByName("DelegateCaller");
-    return await DelegateCaller.deploy();
+    return (await DelegateCaller.deploy()) as DelegateCaller;
 };
 
 export const compile = async (source: string) => {
@@ -237,7 +237,7 @@ export const compile = async (source: string) => {
     };
 };
 
-export const deployContract = async (deployer: Signer, source: string): Promise<ethers.BaseContract> => {
+export const deployContract = async (deployer: Signer, source: string): Promise<ethers.Contract> => {
     if (!hre.network.zksync) {
         const output = await compile(source);
         const transaction = await deployer.sendTransaction({ data: output.data, gasLimit: 6000000 });
@@ -255,7 +255,7 @@ export const deployContract = async (deployer: Signer, source: string): Promise<
         // Encode and send the deploy transaction providing factory dependencies.
         const contract = await factory.deploy();
 
-        return contract;
+        return contract as ethers.Contract;
     }
 };
 
@@ -264,4 +264,11 @@ export const getWallets = async () => {
     if (hre.network.zksync) return hre.zksyncEthers.getWallets();
 
     throw new Error("You can get wallets only on Hardhat or ZkSyncLocal networks!");
+};
+
+export const getSignMessageLib = async () => {
+    const SignMessageLibDeployment = await deployments.get("SignMessageLib");
+    const SignMessageLib = await hre.ethers.getContractAt("SignMessageLib", SignMessageLibDeployment.address);
+
+    return SignMessageLib;
 };

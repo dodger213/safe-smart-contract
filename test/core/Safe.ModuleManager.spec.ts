@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import hre, { ethers } from "hardhat";
+import hre from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
 import { getSafeWithOwners, getMock, getWallets } from "../utils/setup";
 import { executeContractCallWithSigners } from "../../src/utils/execution";

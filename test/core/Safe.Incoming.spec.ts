@@ -84,14 +84,7 @@ describe("Safe", () => {
             } = await setupTests();
             const safeAddress = await safe.getAddress();
 
-            if (hre.network.zksync) {
-                await expect((await user1.sendTransaction({ to: safeAddress, value: 23, data: "0xbaddad", gasLimit: 150000 })).wait()).to.be
-                    .reverted;
-            } else {
-                await expect(user1.sendTransaction({ to: safeAddress, value: 23, data: "0xbaddad" })).to.be.revertedWith(
-                    "fallback function is not payable and was called with value 23",
-                );
-            }
+            await expect(user1.sendTransaction({ to: safeAddress, value: 23, data: "0xbaddad" })).to.be.revertedWithoutReason();
         });
     });
 });
