@@ -1,7 +1,13 @@
 import { expect } from "chai";
 import hre, { ethers } from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
-import { defaultTokenCallbackHandlerDeployment, deployContract, getSafeTemplate, getTokenCallbackHandler, getWallets } from "../utils/setup";
+import {
+    defaultTokenCallbackHandlerDeployment,
+    deployContract,
+    getSafeTemplate,
+    getTokenCallbackHandler,
+    getWallets,
+} from "../utils/setup";
 import { executeContractCallWithSigners } from "../../src/utils/execution";
 
 describe("FallbackManager", () => {

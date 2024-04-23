@@ -1,21 +1,8 @@
 import { exec } from "child_process";
-import { ContractInterface } from "ethers";
+import { JsonFragment } from "ethers";
 import { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } from "hardhat/builtin-tasks/task-names";
 import { Compiler } from "hardhat/internal/solidity/compiler/downloader";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import * as zk from "zksync-ethers";
-
-export const getZkContractFactoryByName = async (hre: HardhatRuntimeEnvironment, contractName: string, signer: zk.Signer | zk.Wallet) => {
-    const artifact = await hre.artifacts.readArtifact(contractName);
-
-    if (artifact.bytecode === "0x") {
-        throw new Error(
-            `You are trying to create a contract factory for the contract ${contractName}, which is abstract and can't be deployed.`,
-        );
-    }
-
-    return new zk.ContractFactory(artifact.abi, artifact.bytecode, signer, "create");
-};
 
 let _solcBuild: Compiler;
 async function getSolcBuild(hre: HardhatRuntimeEnvironment) {
@@ -28,7 +15,10 @@ async function getSolcBuild(hre: HardhatRuntimeEnvironment) {
     return _solcBuild;
 }
 
-export async function zkCompile(hre: HardhatRuntimeEnvironment, source: string): Promise<{ data: string; abi: ContractInterface }> {
+export async function zkCompile(
+    hre: HardhatRuntimeEnvironment,
+    source: string,
+): Promise<{ data: string; abi: ReadonlyArray<JsonFragment> }> {
     const zkSolcCompilerPath = hre.config.zksolc.settings.compilerPath;
     const solcBuild = await getSolcBuild(hre);
 

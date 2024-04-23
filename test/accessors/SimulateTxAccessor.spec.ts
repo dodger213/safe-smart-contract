@@ -75,7 +75,7 @@ describe("SimulateTxAccessor", () => {
                 userBalance + ethers.parseEther("1"),
             );
             expect(simulation.success).to.be.true;
-            expect(simulation.estimate.toNumber()).to.be.lte(hre.network.zksync ? 30000n : 15000n);
+            expect(simulation.estimate).to.be.lte(15000n);
         });
 
         it("simulate revert", async () => {

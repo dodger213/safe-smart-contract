@@ -5,7 +5,7 @@ import solc from "solc";
 import * as zk from "zksync-ethers";
 import { logGas } from "../../src/utils/execution";
 import { safeContractUnderTest } from "./config";
-import { getZkContractFactoryByName, zkCompile } from "./zk";
+import { zkCompile } from "./zkSync";
 import { getRandomIntAsString } from "./numbers";
 import { Safe, SafeL2 } from "../../typechain-types";
 
@@ -112,13 +112,13 @@ export const migrationContractFrom130To141 = async () => {
 export const getMock = async () => {
     const contractFactory = await getContractFactoryByName("MockContract");
     const contract = await contractFactory.deploy();
-    return contract.deployed();
+
+    return contract;
 };
 
-export const getContractFactoryByName = async (contractName: string) => {
+export const getContractFactoryByName = async (contractName: string): Promise<ethers.ContractFactory | zk.ContractFactory> => {
     if (hre.network.zksync) {
-        const signers = await getWallets();
-        return getZkContractFactoryByName(hre, contractName, signers[0] as zk.Wallet);
+        return hre.zksyncEthers.getContractFactory(contractName);
     } else {
         return hre.ethers.getContractFactory(contractName);
     }
@@ -237,7 +237,7 @@ export const compile = async (source: string) => {
     };
 };
 
-export const deployContract = async (deployer: Signer, source: string): Promise<Contract> => {
+export const deployContract = async (deployer: Signer, source: string): Promise<ethers.BaseContract> => {
     if (!hre.network.zksync) {
         const output = await compile(source);
         const transaction = await deployer.sendTransaction({ data: output.data, gasLimit: 6000000 });

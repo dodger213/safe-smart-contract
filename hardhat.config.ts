@@ -3,6 +3,7 @@ import type { HardhatUserConfig, HttpNetworkUserConfig } from "hardhat/types";
 import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
+import "@matterlabs/hardhat-zksync-ethers";
 import "hardhat-deploy";
 import dotenv from "dotenv";
 import yargs from "yargs";
