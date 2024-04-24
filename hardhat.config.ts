@@ -4,6 +4,7 @@ import "@matterlabs/hardhat-zksync-deploy";
 import "@matterlabs/hardhat-zksync-solc";
 import "@matterlabs/hardhat-zksync-verify";
 import "@matterlabs/hardhat-zksync-ethers";
+import "@matterlabs/hardhat-zksync-node";
 import "hardhat-deploy";
 import dotenv from "dotenv";
 import yargs from "yargs";
@@ -20,7 +21,16 @@ const argv = yargs
 
 // Load environment variables.
 dotenv.config();
-const { NODE_URL, INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS } = process.env;
+const {
+    NODE_URL,
+    INFURA_KEY,
+    MNEMONIC,
+    ETHERSCAN_API_KEY,
+    PK,
+    SOLIDITY_VERSION,
+    SOLIDITY_SETTINGS,
+    HARDHAT_RUN_ZKSYNC_NODE = "",
+} = process.env;
 
 const DEFAULT_MNEMONIC = "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
 
@@ -80,16 +90,13 @@ const userConfig: HardhatUserConfig = {
     },
     zksolc: {
         version: "1.4.0",
-        compilerSource: "binary",
-        settings: {
-            isSystem: true,
-        },
     },
     networks: {
         hardhat: {
             allowUnlimitedContractSize: true,
             blockGasLimit: 100000000,
             gas: 100000000,
+            zksync: Boolean(HARDHAT_RUN_ZKSYNC_NODE),
         },
         mainnet: {
             ...sharedNetworkConfig,

@@ -5,6 +5,7 @@ import { deployContract, getSafeWithOwners, getWallets } from "../utils/setup";
 describe("Safe", () => {
     const setupTests = hre.deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
+        console.log("AFTER DEPLOYMENTS.FIXTURE");
         const source = `
         contract Test {
             function transferEth(address payable safe) public payable returns (bool success) {
@@ -28,7 +29,8 @@ describe("Safe", () => {
     });
 
     describe("fallback", () => {
-        it("should be able to receive ETH via transfer", async () => {
+        it.only("should be able to receive ETH via transfer", async () => {
+            console.log("LFG");
             const { safe, caller } = await setupTests();
             const safeAddress = await safe.getAddress();
 

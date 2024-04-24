@@ -260,6 +260,7 @@ export const deployContract = async (deployer: Signer, source: string): Promise<
 };
 
 export const getWallets = async () => {
+    console.log({ network: hre.network });
     if (hre.network.name === "hardhat") return hre.ethers.getSigners();
     if (hre.network.zksync) return hre.zksyncEthers.getWallets();
 
