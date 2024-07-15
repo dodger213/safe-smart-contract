@@ -9,6 +9,7 @@ import "hardhat-deploy";
 import dotenv from "dotenv";
 import yargs from "yargs";
 import { getSingletonFactoryInfo } from "@safe-global/safe-singleton-factory";
+import { LOCAL_NODE_RICH_WALLETS } from "./src/zk-utils/constants";
 
 const argv = yargs
     .option("network", {
@@ -38,9 +39,9 @@ const sharedNetworkConfig: HttpNetworkUserConfig = {};
 if (PK) {
     sharedNetworkConfig.accounts = [PK];
 } else {
-    sharedNetworkConfig.accounts = {
-        mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
-    };
+    // sharedNetworkConfig.accounts = {
+    //     mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
+    // };
 }
 
 if (["mainnet", "rinkeby", "kovan", "goerli", "ropsten", "mumbai", "polygon"].includes(argv.network) && INFURA_KEY === undefined) {
@@ -89,7 +90,8 @@ const userConfig: HardhatUserConfig = {
         compilers: [{ version: primarySolidityVersion, settings: soliditySettings }, { version: defaultSolidityVersion }],
     },
     zksolc: {
-        version: "1.4.0",
+        version: "1.5.1",
+        settings: {},
     },
     networks: {
         hardhat: {
@@ -97,6 +99,7 @@ const userConfig: HardhatUserConfig = {
             blockGasLimit: 100000000,
             gas: 100000000,
             zksync: Boolean(HARDHAT_RUN_ZKSYNC_NODE),
+            autoImpersonate: false,
         },
         mainnet: {
             ...sharedNetworkConfig,
@@ -152,11 +155,12 @@ const userConfig: HardhatUserConfig = {
             chainId: 270,
             url: "http://localhost:3050",
             ethNetwork: "http://localhost:8545",
+            accounts: LOCAL_NODE_RICH_WALLETS.map((w) => w.privateKey),
             zksync: true,
-            saveDeployments: true,
+            saveDeployments: false,
         },
     },
-    deterministicDeployment,
+    // deterministicDeployment,
     namedAccounts: {
         deployer: 0,
     },

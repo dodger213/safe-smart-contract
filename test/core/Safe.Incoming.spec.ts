@@ -29,7 +29,7 @@ describe("Safe", () => {
     });
 
     describe("fallback", () => {
-        it.only("should be able to receive ETH via transfer", async () => {
+        it("should be able to receive ETH via transfer", async () => {
             console.log("LFG");
             const { safe, caller } = await setupTests();
             const safeAddress = await safe.getAddress();

@@ -10,28 +10,28 @@ const deploy: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         from: deployer,
         args: [],
         log: true,
-        deterministicDeployment: true,
+        deterministicDeployment: false,
     });
 
     await deploy("MultiSend", {
         from: deployer,
         args: [],
         log: true,
-        deterministicDeployment: true,
+        deterministicDeployment: false,
     });
 
     await deploy("MultiSendCallOnly", {
         from: deployer,
         args: [],
         log: true,
-        deterministicDeployment: true,
+        deterministicDeployment: false,
     });
 
     await deploy("SignMessageLib", {
         from: deployer,
         args: [],
         log: true,
-        deterministicDeployment: true,
+        deterministicDeployment: false,
     });
 };
 

@@ -7,7 +7,7 @@ import { calculateSafeDomainSeparator } from "../../src/utils/execution";
 import { AddressOne } from "../../src/utils/constants";
 import { chainId, encodeTransfer } from "../utils/encoding";
 
-describe("Safe", () => {
+describe.only("Safe", () => {
     const setupTests = hre.deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
         const signers = await getWallets();
