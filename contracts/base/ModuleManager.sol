@@ -1,133 +1,292 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+/* solhint-disable one-contract-per-file */
 pragma solidity >=0.7.0 <0.9.0;
-import "../common/Enum.sol";
-import "../common/SelfAuthorized.sol";
-import "./Executor.sol";
+import {Enum} from "../libraries/Enum.sol";
+import {SelfAuthorized} from "../common/SelfAuthorized.sol";
+import {Executor} from "./Executor.sol";
+import {IModuleManager} from "../interfaces/IModuleManager.sol";
+import {IERC165} from "../interfaces/IERC165.sol";
 
-/// @title Module Manager - A contract that manages modules that can execute transactions via this contract
-/// @author Stefan George - <stefan@gnosis.pm>
-/// @author Richard Meissner - <richard@gnosis.pm>
-contract ModuleManager is SelfAuthorized, Executor {
-    event EnabledModule(address module);
-    event DisabledModule(address module);
-    event ExecutionFromModuleSuccess(address indexed module);
-    event ExecutionFromModuleFailure(address indexed module);
+/**
+ * @title IModuleGuard Interface
+ */
+interface IModuleGuard is IERC165 {
+    /**
+     * @notice Checks the module transaction details.
+     * @dev The function needs to implement module transaction validation logic.
+     * @param to The address to which the transaction is intended.
+     * @param value The value of the transaction in Wei.
+     * @param data The transaction data.
+     * @param operation The type of operation of the module transaction.
+     * @param module The module involved in the transaction.
+     * @return moduleTxHash The hash of the module transaction.
+     */
+    function checkModuleTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        address module
+    ) external returns (bytes32 moduleTxHash);
 
+    /**
+     * @notice Checks after execution of module transaction.
+     * @dev The function needs to implement a check after the execution of the module transaction.
+     * @param txHash The hash of the module transaction.
+     * @param success The status of the module transaction execution.
+     */
+    function checkAfterModuleExecution(bytes32 txHash, bool success) external;
+}
+
+abstract contract BaseModuleGuard is IModuleGuard {
+    function supportsInterface(bytes4 interfaceId) external view virtual override returns (bool) {
+        return
+            interfaceId == type(IModuleGuard).interfaceId || // 0x58401ed8
+            interfaceId == type(IERC165).interfaceId; // 0x01ffc9a7
+    }
+}
+
+/**
+ * @title Module Manager - A contract managing Safe modules
+ * @notice Modules are extensions with unlimited access to a Safe that can be added to a Safe by its owners.
+           ⚠️ WARNING: Modules are a security risk since they can execute arbitrary transactions, 
+           so only trusted and audited modules should be added to a Safe. A malicious module can
+           completely takeover a Safe.
+ * @author Stefan George - @Georgi87
+ * @author Richard Meissner - @rmeissner
+ */
+abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
+    // SENTINEL_MODULES is used to traverse `modules`, so that:
+    //      1. `modules[SENTINEL_MODULES]` contains the first module
+    //      2. `modules[last_module]` points back to SENTINEL_MODULES
     address internal constant SENTINEL_MODULES = address(0x1);
+
+    // keccak256("module_manager.module_guard.address")
+    bytes32 internal constant MODULE_GUARD_STORAGE_SLOT = 0xb104e0b93118902c651344349b610029d694cfdec91c589c91ebafbcd0289947;
 
     mapping(address => address) internal modules;
 
+    /**
+     * @notice Setup function sets the initial storage of the contract.
+     *         Optionally executes a delegate call to another contract to setup the modules.
+     * @param to Optional destination address of call to execute.
+     * @param data Optional data of call to execute.
+     */
     function setupModules(address to, bytes memory data) internal {
-        require(modules[SENTINEL_MODULES] == address(0), "GS100");
+        if (modules[SENTINEL_MODULES] != address(0)) revertWithError("GS100");
         modules[SENTINEL_MODULES] = SENTINEL_MODULES;
-        if (to != address(0))
+        if (to != address(0)) {
+            if (!isContract(to)) revertWithError("GS002");
             // Setup has to complete successfully or transaction fails.
-            require(execute(to, 0, data, Enum.Operation.DelegateCall, gasleft()), "GS000");
+            if (!execute(to, 0, data, Enum.Operation.DelegateCall, type(uint256).max)) revertWithError("GS000");
+        }
     }
 
-    /// @dev Allows to add a module to the whitelist.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Enables the module `module` for the Safe.
-    /// @param module Module to be whitelisted.
-    function enableModule(address module) public authorized {
+    /**
+     * @notice Runs pre-execution checks for module transactions if a guard is enabled.
+     * @param to Target address of module transaction.
+     * @param value Ether value of module transaction.
+     * @param data Data payload of module transaction.
+     * @param operation Operation type of module transaction.
+     * @return guard Guard to be used for checking.
+     * @return guardHash Hash returned from the guard tx check.
+     */
+    function preModuleExecution(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal returns (address guard, bytes32 guardHash) {
+        onBeforeExecTransactionFromModule(to, value, data, operation);
+        guard = getModuleGuard();
+
+        // Only whitelisted modules are allowed.
+        require(msg.sender != SENTINEL_MODULES && modules[msg.sender] != address(0), "GS104");
+
+        if (guard != address(0)) {
+            guardHash = IModuleGuard(guard).checkModuleTransaction(to, value, data, operation, msg.sender);
+        }
+    }
+
+    /**
+     * @notice Runs post-execution checks for module transactions if a guard is enabled.
+     * @param guardHash Hash returned from the guard during pre execution check.
+     * @param success Boolean flag indicating if the call succeeded.
+     * @param guard Guard to be used for checking.
+     * @dev Emits event based on module transaction success.
+     */
+    function postModuleExecution(address guard, bytes32 guardHash, bool success) internal {
+        if (guard != address(0)) {
+            IModuleGuard(guard).checkAfterModuleExecution(guardHash, success);
+        }
+        if (success) emit ExecutionFromModuleSuccess(msg.sender);
+        else emit ExecutionFromModuleFailure(msg.sender);
+    }
+
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function enableModule(address module) public override authorized {
         // Module address cannot be null or sentinel.
-        require(module != address(0) && module != SENTINEL_MODULES, "GS101");
+        if (module == address(0) || module == SENTINEL_MODULES) revertWithError("GS101");
         // Module cannot be added twice.
-        require(modules[module] == address(0), "GS102");
+        if (modules[module] != address(0)) revertWithError("GS102");
         modules[module] = modules[SENTINEL_MODULES];
         modules[SENTINEL_MODULES] = module;
         emit EnabledModule(module);
     }
 
-    /// @dev Allows to remove a module from the whitelist.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Disables the module `module` for the Safe.
-    /// @param prevModule Module that pointed to the module to be removed in the linked list
-    /// @param module Module to be removed.
-    function disableModule(address prevModule, address module) public authorized {
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function disableModule(address prevModule, address module) public override authorized {
         // Validate module address and check that it corresponds to module index.
-        require(module != address(0) && module != SENTINEL_MODULES, "GS101");
-        require(modules[prevModule] == module, "GS103");
+        if (module == address(0) || module == SENTINEL_MODULES) revertWithError("GS101");
+        if (modules[prevModule] != module) revertWithError("GS103");
         modules[prevModule] = modules[module];
         modules[module] = address(0);
         emit DisabledModule(module);
     }
 
-    /// @dev Allows a Module to execute a Safe transaction without any further confirmations.
-    /// @param to Destination address of module transaction.
-    /// @param value Ether value of module transaction.
-    /// @param data Data payload of module transaction.
-    /// @param operation Operation type of module transaction.
+    /**
+     * @inheritdoc IModuleManager
+     */
     function execTransactionFromModule(
         address to,
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) public virtual returns (bool success) {
-        // Only whitelisted modules are allowed.
-        require(msg.sender != SENTINEL_MODULES && modules[msg.sender] != address(0), "GS104");
-        // Execute transaction without further confirmations.
-        success = executeInlineGas(to, value, data, operation);
-        if (success) emit ExecutionFromModuleSuccess(msg.sender);
-        else emit ExecutionFromModuleFailure(msg.sender);
+    ) external override returns (bool success) {
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
+        success = execute(to, value, data, operation, type(uint256).max);
+        postModuleExecution(guard, guardHash, success);
+
     }
 
-    /// @dev Allows a Module to execute a Safe transaction without any further confirmations and return data
-    /// @param to Destination address of module transaction.
-    /// @param value Ether value of module transaction.
-    /// @param data Data payload of module transaction.
-    /// @param operation Operation type of module transaction.
+    /**
+     * @inheritdoc IModuleManager
+     */
     function execTransactionFromModuleReturnData(
         address to,
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) public returns (bool success, bytes memory returnData) {
-        success = execTransactionFromModule(to, value, data, operation);
-        // solhint-disable-next-line no-inline-assembly
+    ) external override returns (bool success, bytes memory returnData) {
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
+        success = execute(to, value, data, operation, type(uint256).max);
+        /* solhint-disable no-inline-assembly */
+        /// @solidity memory-safe-assembly
         assembly {
             // Load free memory location
-            let ptr := mload(0x40)
+            returnData := mload(0x40)
             // We allocate memory for the return data by setting the free memory location to
             // current free memory location + data size + 32 bytes for data size value
-            mstore(0x40, add(ptr, add(returndatasize(), 0x20)))
+            mstore(0x40, add(returnData, add(returndatasize(), 0x20)))
             // Store the size
-            mstore(ptr, returndatasize())
+            mstore(returnData, returndatasize())
             // Store the data
-            returndatacopy(add(ptr, 0x20), 0, returndatasize())
-            // Point the return data to the correct memory location
-            returnData := ptr
+            returndatacopy(add(returnData, 0x20), 0, returndatasize())
         }
+        /* solhint-enable no-inline-assembly */
+        postModuleExecution(guard, guardHash, success);
     }
 
-    /// @dev Returns if an module is enabled
-    /// @return True if the module is enabled
-    function isModuleEnabled(address module) public view returns (bool) {
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function isModuleEnabled(address module) public view override returns (bool) {
         return SENTINEL_MODULES != module && modules[module] != address(0);
     }
 
-    /// @dev Returns array of modules.
-    /// @param start Start of the page.
-    /// @param pageSize Maximum number of modules that should be returned.
-    /// @return array Array of modules.
-    /// @return next Start of the next page.
-    function getModulesPaginated(address start, uint256 pageSize) external view returns (address[] memory array, address next) {
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function getModulesPaginated(address start, uint256 pageSize) external view override returns (address[] memory array, address next) {
+        if (start != SENTINEL_MODULES && !isModuleEnabled(start)) revertWithError("GS105");
+        if (pageSize == 0) revertWithError("GS106");
         // Init array with max page size
         array = new address[](pageSize);
 
         // Populate return array
         uint256 moduleCount = 0;
-        address currentModule = modules[start];
-        while (currentModule != address(0x0) && currentModule != SENTINEL_MODULES && moduleCount < pageSize) {
-            array[moduleCount] = currentModule;
-            currentModule = modules[currentModule];
+        next = modules[start];
+        while (next != address(0) && next != SENTINEL_MODULES && moduleCount < pageSize) {
+            array[moduleCount] = next;
+            next = modules[next];
             moduleCount++;
         }
-        next = currentModule;
+
+        /**
+          Because of the argument validation, we can assume that the loop will always iterate over the valid module list values
+          and the `next` variable will either be an enabled module or a sentinel address (signalling the end). 
+          
+          If we haven't reached the end inside the loop, we need to set the next pointer to the last element of the modules array
+          because the `next` variable (which is a module by itself) acting as a pointer to the start of the next page is neither 
+          included to the current page, nor will it be included in the next one if you pass it as a start.
+        */
+        if (next != SENTINEL_MODULES) {
+            next = array[moduleCount - 1];
+        }
         // Set correct size of returned array
-        // solhint-disable-next-line no-inline-assembly
+        /* solhint-disable no-inline-assembly */
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(array, moduleCount)
         }
+        /* solhint-enable no-inline-assembly */
     }
+
+    /**
+     * @notice Returns true if `account` is a contract.
+     * @dev This function will return false if invoked during the constructor of a contract,
+     *      as the code is not actually created until after the constructor finishes.
+     * @param account The address being queried
+     */
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        /* solhint-disable no-inline-assembly */
+        /// @solidity memory-safe-assembly
+        assembly {
+            size := extcodesize(account)
+        }
+        /* solhint-enable no-inline-assembly */
+        return size > 0;
+    }
+
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function setModuleGuard(address moduleGuard) external override authorized {
+        if (moduleGuard != address(0) && !IModuleGuard(moduleGuard).supportsInterface(type(IModuleGuard).interfaceId))
+            revertWithError("GS301");
+
+        bytes32 slot = MODULE_GUARD_STORAGE_SLOT;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            sstore(slot, moduleGuard)
+        }
+        emit ChangedModuleGuard(moduleGuard);
+    }
+
+    /**
+     * @dev Internal method to retrieve the current module guard
+     * @return moduleGuard The address of the guard
+     */
+    function getModuleGuard() internal view returns (address moduleGuard) {
+        bytes32 slot = MODULE_GUARD_STORAGE_SLOT;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            moduleGuard := sload(slot)
+        }
+    }
+
+    /**
+     * @notice A hook that gets called before execution of {execTransactionFromModule*} methods.
+
+     * @param to Destination address of module transaction.
+     * @param value Ether value of module transaction.
+     * @param data Data payload of module transaction.
+     * @param operation Operation type of module transaction.
+     */
+    function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal virtual {}
 }

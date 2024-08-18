@@ -1,72 +1,93 @@
+import { signHash } from "./../../src/utils/execution";
 import { expect } from "chai";
-import hre, { deployments, waffle } from "hardhat";
-import "@nomiclabs/hardhat-ethers";
-import { getMock, getSafeWithOwners } from "../utils/setup";
-import { buildSafeTransaction, calculateSafeTransactionHash, executeContractCallWithSigners, executeTxWithSigners } from "../../src/utils/execution";
+import hre, { deployments, ethers } from "hardhat";
+import { getMock, getSafe } from "../utils/setup";
+import { buildSafeTransaction, calculateSafeTransactionHash, executeContractCallWithSigners, executeTx } from "../../src/utils/execution";
 import { chainId } from "../utils/encoding";
 
-describe("DebugTransactionGuard", async () => {
-
-    const [user1] = waffle.provider.getWallets();
-
+describe("DebugTransactionGuard", () => {
     const setupTests = deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
-        const safe = await getSafeWithOwners([user1.address])
+        const signers = await ethers.getSigners();
+        const [user1] = signers;
+        const safe = await getSafe({ owners: [user1.address] });
         const guardFactory = await hre.ethers.getContractFactory("DebugTransactionGuard");
-        const guard = await guardFactory.deploy()
-        const mock = await getMock()
-        await executeContractCallWithSigners(safe, safe, "setGuard", [guard.address], [user1])
+        const guard = await guardFactory.deploy();
+        const guardAddress = await guard.getAddress();
+        const mock = await getMock();
+        await executeContractCallWithSigners(safe, safe, "setGuard", [guardAddress], [user1]);
         return {
             safe,
             mock,
             guardFactory,
-            guard
-        }
-    })
+            guard,
+            signers,
+        };
+    });
 
-    describe("fallback", async () => {
-        it('must NOT revert on fallback without value', async () => {
-            const { guard } = await setupTests()
+    describe("fallback", () => {
+        it("must NOT revert on fallback without value", async () => {
+            const {
+                guard,
+                signers: [user1],
+            } = await setupTests();
+            const guardAddress = await guard.getAddress();
             await user1.sendTransaction({
-                to: guard.address,
-                data: "0xbaddad"
-            })
-        })
-        it('should revert on fallback with value', async () => {
-            const { guard } = await setupTests()
+                to: guardAddress,
+                data: "0xbaddad",
+            });
+        });
+        it("should revert on fallback with value", async () => {
+            const {
+                guard,
+                signers: [user1],
+            } = await setupTests();
+            const guardAddress = await guard.getAddress();
             await expect(
                 user1.sendTransaction({
-                    to: guard.address,
+                    to: guardAddress,
                     data: "0xbaddad",
-                    value: 1
-                })
-            ).to.be.reverted
-        })
-    })
+                    value: 1,
+                }),
+            ).to.be.reverted;
+        });
+    });
 
-    describe("checkTransaction", async () => {
-        it('should emit debug events', async () => {
-            const { safe, mock, guard } = await setupTests()
-            const nonce = await safe.nonce()
-            const safeTx = buildSafeTransaction({ to: mock.address, data: "0xbaddad42", nonce })
-            const safeTxHash = calculateSafeTransactionHash(safe, safeTx, await chainId())
+    describe("checkTransaction", () => {
+        it("should emit debug events", async () => {
+            const {
+                safe,
+                mock,
+                guard,
+                signers: [user1],
+            } = await setupTests();
+            const safeAddress = await safe.getAddress();
+            const mockAddress = await mock.getAddress();
+            const nonce = await safe.nonce();
+            const safeTx = buildSafeTransaction({ to: mockAddress, data: "0xbaddad42", nonce });
+            const safeTxHash = calculateSafeTransactionHash(safeAddress, safeTx, await chainId());
+            const signature = await signHash(user1, safeTxHash);
 
-            await expect(
-                executeTxWithSigners(safe, safeTx, [user1])
-            ).to.emit(guard, "TransactionDetails").withArgs(
-                safe.address,
-                safeTxHash,
-                safeTx.to,
-                safeTx.value,
-                safeTx.data,
-                safeTx.operation,
-                safeTx.safeTxGas,
-                false,
-                safeTx.nonce
-            ).and.to.emit(guard, "GasUsage").withArgs(safe.address, safeTxHash, nonce, true)
-            
-            expect(await mock.callStatic.invocationCount()).to.be.eq(1);
-            expect(await mock.callStatic.invocationCountForCalldata("0xbaddad42")).to.be.eq(1);
-        })
-    })
-})
+            await expect(executeTx(safe, safeTx, [signature]))
+                .to.emit(guard, "TransactionDetails")
+                .withArgs(
+                    safeAddress,
+                    safeTxHash,
+                    safeTx.to,
+                    safeTx.value,
+                    safeTx.data,
+                    safeTx.operation,
+                    safeTx.safeTxGas,
+                    false,
+                    safeTx.nonce,
+                    signature.data,
+                    user1.address,
+                )
+                .and.to.emit(guard, "GasUsage")
+                .withArgs(safeAddress, safeTxHash, nonce, true);
+
+            expect(await mock.invocationCount.staticCall()).to.be.eq(1);
+            expect(await mock.invocationCountForCalldata.staticCall("0xbaddad42")).to.be.eq(1);
+        });
+    });
+});
