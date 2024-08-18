@@ -6,17 +6,25 @@ import yargs from "yargs";
 import { getSingletonFactoryInfo } from "@safe-global/safe-singleton-factory";
 
 const argv = yargs
-    .option("network", {
-        type: "string",
-        default: "hardhat",
-    })
-    .help(false)
-    .version(false)
-    .parseSync();
+  .option("network", {
+    type: "string",
+    default: "hardhat",
+  })
+  .help(false)
+  .version(false)
+  .parseSync();
 
 // Load environment variables.
 dotenv.config();
-const { NODE_URL, INFURA_KEY, MNEMONIC, ETHERSCAN_API_KEY, PK, SOLIDITY_VERSION, SOLIDITY_SETTINGS, HARDHAT_CHAIN_ID } = process.env;
+const {
+  NODE_URL,
+  INFURA_KEY,
+  MNEMONIC,
+  ETHERSCAN_API_KEY,
+  PK,
+  SOLIDITY_VERSION,
+  SOLIDITY_SETTINGS,
+} = process.env;
 
 const DEFAULT_MNEMONIC = "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
 
@@ -29,8 +37,22 @@ if (PK) {
     };
 }
 
-if (["mainnet", "rinkeby", "kovan", "goerli", "ropsten", "mumbai", "polygon"].includes(argv.network) && INFURA_KEY === undefined) {
-    throw new Error(`Could not find Infura key in env, unable to connect to network ${argv.network}`);
+if (
+  [
+    "mainnet",
+    "rinkeby",
+    "kovan",
+    "goerli",
+    "ropsten",
+    "mumbai",
+    "polygon",
+  ].includes(argv.network) &&
+  INFURA_KEY === undefined
+) {
+  throw new Error(
+    `Could not find Infura key in env, unable to connect to network ${argv.network}`,
+  );
+
 }
 
 import "./src/tasks/local_verify";
@@ -41,97 +63,119 @@ import { DeterministicDeploymentInfo } from "hardhat-deploy/dist/types";
 
 const defaultSolidityVersion = "0.7.6";
 const primarySolidityVersion = SOLIDITY_VERSION || defaultSolidityVersion;
-const soliditySettings = SOLIDITY_SETTINGS ? JSON.parse(SOLIDITY_SETTINGS) : undefined;
+const soliditySettings = SOLIDITY_SETTINGS
+  ? JSON.parse(SOLIDITY_SETTINGS)
+  : undefined;
 
-const deterministicDeployment = (network: string): DeterministicDeploymentInfo => {
-    const info = getSingletonFactoryInfo(parseInt(network));
-    if (!info) {
-        throw new Error(`
+const deterministicDeployment = (
+  network: string,
+): DeterministicDeploymentInfo => {
+  const info = getSingletonFactoryInfo(parseInt(network));
+  if (!info) {
+    throw new Error(`
         Safe factory not found for network ${network}. You can request a new deployment at https://github.com/safe-global/safe-singleton-factory.
         For more information, see https://github.com/safe-global/safe-smart-account#replay-protection-eip-155
       `);
-    }
-    return {
-        factory: info.address,
-        deployer: info.signerAddress,
-        funding: BigNumber.from(info.gasLimit).mul(BigNumber.from(info.gasPrice)).toString(),
-        signedTx: info.transaction,
-    };
+  }
+  return {
+    factory: info.address,
+    deployer: info.signerAddress,
+    funding: BigNumber.from(info.gasLimit)
+      .mul(BigNumber.from(info.gasPrice))
+      .toString(),
+    signedTx: info.transaction,
+  };
 };
 
 const userConfig: HardhatUserConfig = {
-    paths: {
-        artifacts: "build/artifacts",
-        cache: "build/cache",
-        deploy: "src/deploy",
-        sources: "contracts",
+  paths: {
+    artifacts: "build/artifacts",
+    cache: "build/cache",
+    deploy: "src/deploy",
+    sources: "contracts",
+  },
+  typechain: {
+    outDir: "typechain-types",
+    target: "ethers-v6",
+  },
+  solidity: {
+    compilers: [
+      { version: primarySolidityVersion, settings: soliditySettings },
+      { version: defaultSolidityVersion },
+    ],
+  },
+  networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true,
+      blockGasLimit: 100000000,
+      gas: 100000000,
     },
-    typechain: {
-        outDir: "typechain-types",
-        target: "ethers-v6",
+    mainnet: {
+      ...sharedNetworkConfig,
+      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
     },
-    solidity: {
-        compilers: [{ version: primarySolidityVersion, settings: soliditySettings }, { version: defaultSolidityVersion }],
+    gnosis: {
+      ...sharedNetworkConfig,
+      url: "https://rpc.gnosischain.com",
     },
-    networks: {
-        hardhat: {
-            allowUnlimitedContractSize: true,
-            blockGasLimit: 100000000,
-            gas: 100000000,
-            chainId: typeof HARDHAT_CHAIN_ID === "string" && !Number.isNaN(parseInt(HARDHAT_CHAIN_ID)) ? parseInt(HARDHAT_CHAIN_ID) : 31337,
-        },
-        mainnet: {
-            ...sharedNetworkConfig,
-            url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
-        },
-        gnosis: {
-            ...sharedNetworkConfig,
-            url: "https://rpc.gnosischain.com",
-        },
-        goerli: {
-            ...sharedNetworkConfig,
-            url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
-        },
-        mumbai: {
-            ...sharedNetworkConfig,
-            url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
-        },
-        polygon: {
-            ...sharedNetworkConfig,
-            url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
-        },
-        bsc: {
-            ...sharedNetworkConfig,
-            url: `https://bsc-dataseed.binance.org/`,
-        },
-        arbitrum: {
-            ...sharedNetworkConfig,
-            url: `https://arb1.arbitrum.io/rpc`,
-        },
-        fantomTestnet: {
-            ...sharedNetworkConfig,
-            url: `https://rpc.testnet.fantom.network/`,
-        },
-        avalanche: {
-            ...sharedNetworkConfig,
-            url: `https://api.avax.network/ext/bc/C/rpc`,
-        },
+    goerli: {
+      ...sharedNetworkConfig,
+      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
     },
-    deterministicDeployment,
-    namedAccounts: {
-        deployer: 0,
+    mumbai: {
+      ...sharedNetworkConfig,
+      url: `https://polygon-mumbai.infura.io/v3/${INFURA_KEY}`,
     },
-    mocha: {
-        timeout: 2000000,
+    polygon: {
+      ...sharedNetworkConfig,
+      url: `https://polygon-mainnet.infura.io/v3/${INFURA_KEY}`,
     },
-    etherscan: {
-        apiKey: ETHERSCAN_API_KEY,
+    bsc: {
+      ...sharedNetworkConfig,
+      url: `https://bsc-dataseed.binance.org/`,
     },
+    arbitrum: {
+      ...sharedNetworkConfig,
+      url: `https://arb1.arbitrum.io/rpc`,
+    },
+    fantomTestnet: {
+      ...sharedNetworkConfig,
+      url: `https://rpc.testnet.fantom.network/`,
+    },
+    avalanche: {
+      ...sharedNetworkConfig,
+      url: `https://api.avax.network/ext/bc/C/rpc`,
+    },
+    worldchain: {
+      ...sharedNetworkConfig,
+      url: `https://worldchain-mainnet.g.alchemy.com/v2/0_XjRVg4tM1eXKp9Je8xkVFflZo4wnrp`,
+    },
+  },
+  deterministicDeployment,
+  namedAccounts: {
+    deployer: 0,
+  },
+  mocha: {
+    timeout: 2000000,
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "worldchain",
+        chainId: 480,
+        urls: {
+          apiURL: "https://worldchain-mainnet-explorer.alchemy.com/api",
+          browserURL: " https://worldchain-mainnet-explorer.alchemy.com/",
+        },
+      },
+    ],
+  },
 };
 if (NODE_URL) {
-    userConfig.networks!.custom = {
-        ...sharedNetworkConfig,
-        url: NODE_URL,
-    };
+  userConfig.networks!.custom = {
+    ...sharedNetworkConfig,
+    url: NODE_URL,
+  };
 }
 export default userConfig;
