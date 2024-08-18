@@ -13,20 +13,19 @@ on:
 jobs:
     verify:
         runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                rule: ["owner", "safe", "module", "nativeTokenRefund", "signatures"]
 
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
 
             - name: Install python
               uses: actions/setup-python@v4
               with: { python-version: 3.11 }
 
-            - name: Install java
-              uses: actions/setup-java@v3
-              with: { java-version: "17", java-package: jre, distribution: semeru }
-
-            - name: Install certora cli-beta
-              run: pip install -Iv certora-cli-beta==4.2.0
+            - name: Install certora cli
+              run: pip install -r certora/requirements.txt
 
             - name: Install solc
               run: |
@@ -41,13 +40,6 @@ jobs:
                   make munged
                   cd ..
                   echo "key length" ${#CERTORAKEY}
-                  ./certora/scripts/${{ matrix.rule }}
+                  certoraRun certora/conf/${{ matrix.rule }}.conf --wait_for_results=all
               env:
                   CERTORAKEY: ${{ secrets.CERTORA_KEY }}
-
-        strategy:
-            fail-fast: false
-            max-parallel: 16
-            matrix:
-                rule:
-                    - verifySafe.sh

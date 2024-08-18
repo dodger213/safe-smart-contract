@@ -35,7 +35,7 @@ The message can be signed two ways on-chain and off-chain.
 
 #### Modules
 
-Modules add additional functionalities to the Safe contracts. They are smart contracts that implement the Safe’s functionality while separating module logic from the Safe’s core contract.
+Modules add additional functionalities to the Safe Smart Account contracts. They are smart contracts that implement the Safe’s functionality while separating module logic from the Safe’s core contract.
 
 A basic Safe does not require any modules. Adding and removing a module requires confirmation from all owners. Events are emitted whenever a module is added or removed and also whenever a module transaction was successful or failed.
 
@@ -54,7 +54,7 @@ The check before a transaction can e.g. programmatically check all of the parame
 
 #### Safe Domain Separator
 
-```json
+```js
 DomainSeparator {
     uint256 chainId;
     address verifyingContract;
@@ -67,7 +67,7 @@ The domain includes the chainId and the address of the Safe account to prevent r
 
 The Safe transaction is defined by the following EIP-712 typed structured data:
 
-```json
+```js
 SafeTx {
     bytes to;
     uint256 value;
@@ -111,7 +111,7 @@ For a detailed description of the Safe transaction gas, please refer to the [saf
 
 The Safe message is defined by the following EIP-712 typed structured data:
 
-```json
+```js
 SafeMessage {
     bytes message;
 }
@@ -140,4 +140,4 @@ If the refund parameter is set to true, the Safe will refund the gas costs to th
 
 #### Fallback contract
 
-A Fallback contract contains logic outside of the scope of the core Safe contracts, such as the token callback logic and/or logic that didn't fit into the core contracts because of bytecode size limitations.
+A Fallback contract contains logic outside of the scope of the core Safe Smart Account, such as the token callback logic and/or logic that didn't fit into the core contracts because of bytecode size limitations.

@@ -1,31 +1,31 @@
 import { expect } from "chai";
-import hre, { deployments, waffle } from "hardhat";
-import { BigNumber } from "ethers";
-import "@nomiclabs/hardhat-ethers";
+import hre, { deployments, ethers } from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
-import { parseEther } from "@ethersproject/units";
+
 import { deployContract, getMock, getSafeSingleton, getSafeTemplate } from "../utils/setup";
 import { calculateSafeDomainSeparator } from "../../src/utils/execution";
 import { AddressOne } from "../../src/utils/constants";
 import { chainId, encodeTransfer } from "../utils/encoding";
 
-describe("Safe", async () => {
-    const [user1, user2, user3] = waffle.provider.getWallets();
-
+describe("Safe", () => {
     const setupTests = deployments.createFixture(async ({ deployments }) => {
-        const { SafeFallbackHandler } = await deployments.fixture();
+
+        await deployments.fixture();
+        const signers = await ethers.getSigners();
         return {
             template: await getSafeTemplate(),
             mock: await getMock(),
-            handler: SafeFallbackHandler.address,
+            signers,
         };
     });
 
-    describe("setup", async () => {
+    describe("setup", () => {
         it("should not allow to call setup on singleton", async () => {
-            await deployments.fixture();
+            const {
+                signers: [user1, user2, user3],
+            } = await setupTests();
             const singleton = await getSafeSingleton();
-            await expect(await singleton.getThreshold()).to.be.deep.eq(BigNumber.from(1));
+            await expect(await singleton.getThreshold()).to.eq(1n);
 
             // Because setup wasn't called on the singleton it breaks the assumption made
             // within `getModulesPaginated` method that the linked list will be always correctly
@@ -51,7 +51,13 @@ describe("Safe", async () => {
         });
 
         it("should set domain hash", async () => {
-            const { template, handler } = await setupTests();
+
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
+
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
@@ -65,14 +71,17 @@ describe("Safe", async () => {
                 ),
             )
                 .to.emit(template, "SafeSetup")
-                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, AddressZero, handler);
-            await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(template, await chainId()));
+                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, AddressZero, AddressZero);
+            await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(templateAddress, await chainId()));
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
-            await expect(await template.getThreshold()).to.be.deep.eq(BigNumber.from(2));
+            await expect(await template.getThreshold()).to.be.deep.eq(2n);
         });
 
         it("should revert if called twice", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
             await template.setup(
                 [user1.address, user2.address, user3.address],
                 2,
@@ -98,7 +107,10 @@ describe("Safe", async () => {
         });
 
         it("should revert if same owner is included twice", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2],
+            } = await setupTests();
             await expect(
                 template.setup(
                     [user2.address, user1.address, user2.address],
@@ -114,35 +126,51 @@ describe("Safe", async () => {
         });
 
         it("should revert if 0 address is used as an owner", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [, user2],
+            } = await setupTests();
             await expect(
                 template.setup([user2.address, AddressZero], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
             ).to.be.revertedWith("GS203");
         });
 
         it("should revert if Safe itself is used as an owner", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [, user2],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
             await expect(
-                template.setup([user2.address, template.address], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
+                template.setup([user2.address, templateAddress], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
             ).to.be.revertedWith("GS203");
         });
 
         it("should revert if sentinel is used as an owner", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [, user2],
+            } = await setupTests();
             await expect(
                 template.setup([user2.address, AddressOne], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
             ).to.be.revertedWith("GS203");
         });
 
         it("should revert if same owner is included twice one after each other", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [, user2],
+            } = await setupTests();
             await expect(
                 template.setup([user2.address, user2.address], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
             ).to.be.revertedWith("GS204");
         });
 
         it("should revert if threshold is too high", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
@@ -158,7 +186,10 @@ describe("Safe", async () => {
         });
 
         it("should revert if threshold is 0", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
@@ -179,24 +210,31 @@ describe("Safe", async () => {
         });
 
         it("should set fallback handler and call sub inititalizer", async () => {
-            const { template, handler } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
             const source = `
             contract Initializer {
                 function init(bytes4 data) public {
                     bytes32 slot = 0x4242424242424242424242424242424242424242424242424242424242424242;
-                    // solhint-disable-next-line no-inline-assembly
+                    /* solhint-disable no-inline-assembly */
+                    /// @solidity memory-safe-assembly
                     assembly {
                         sstore(slot, data)
                     }
+                    /* solhint-enable no-inline-assembly */
                 }
             }`;
             const testIntializer = await deployContract(user1, source);
+            const testIntializerAddress = await testIntializer.getAddress();
             const initData = testIntializer.interface.encodeFunctionData("init", ["0x42baddad"]);
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
                     2,
-                    testIntializer.address,
+                    testIntializerAddress,
                     initData,
                     handler,
                     AddressZero,
@@ -205,10 +243,10 @@ describe("Safe", async () => {
                 ),
             )
                 .to.emit(template, "SafeSetup")
-                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, testIntializer.address, handler);
-            await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(template, await chainId()));
+                .withArgs(user1.address, [user1.address, user2.address, user3.address], 2, testIntializerAddress, AddressOne);
+            await expect(await template.domainSeparator()).to.be.eq(calculateSafeDomainSeparator(templateAddress, await chainId()));
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
-            await expect(await template.getThreshold()).to.be.deep.eq(BigNumber.from(2));
+            await expect(await template.getThreshold()).to.eq(2n);
 
             await expect(
                 await hre.ethers.provider.getStorageAt(
@@ -216,17 +254,18 @@ describe("Safe", async () => {
                     "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5",
                 ),
             ).to.be.eq(hre.ethers.utils.hexZeroPad(handler.toLowerCase(), 32));
+              
 
             await expect(
-                await hre.ethers.provider.getStorageAt(
-                    template.address,
-                    "0x4242424242424242424242424242424242424242424242424242424242424242",
-                ),
+                await hre.ethers.provider.getStorage(templateAddress, "0x4242424242424242424242424242424242424242424242424242424242424242"),
             ).to.be.eq("0x" + "42baddad".padEnd(64, "0"));
         });
 
         it("should fail if sub initializer fails", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
             const source = `
             contract Initializer {
                 function init(bytes4 data) public {
@@ -234,12 +273,13 @@ describe("Safe", async () => {
                 }
             }`;
             const testIntializer = await deployContract(user1, source);
+            const testIntializerAddress = await testIntializer.getAddress();
             const initData = testIntializer.interface.encodeFunctionData("init", ["0x42baddad"]);
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
                     2,
-                    testIntializer.address,
+                    testIntializerAddress,
                     initData,
                     AddressZero,
                     AddressZero,
@@ -250,7 +290,11 @@ describe("Safe", async () => {
         });
 
         it("should fail if ether payment fails", async () => {
-            const { template, mock } = await setupTests();
+            const {
+                template,
+                mock,
+                signers: [user1, user2, user3],
+            } = await setupTests();
             const payment = 133742;
 
             const transferData = encodeTransfer(user1.address, payment);
@@ -270,11 +314,16 @@ describe("Safe", async () => {
         });
 
         it("should work with ether payment to deployer", async () => {
-            const { template, handler } = await setupTests();
-            const payment = parseEther("10");
-            await user1.sendTransaction({ to: template.address, value: payment });
+            const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
+            const payment = ethers.parseEther("10");
+            await user1.sendTransaction({ to: templateAddress, value: payment });
+
             const userBalance = await hre.ethers.provider.getBalance(user1.address);
-            await expect(await hre.ethers.provider.getBalance(template.address)).to.be.deep.eq(parseEther("10"));
+            await expect(await hre.ethers.provider.getBalance(templateAddress)).to.eq(ethers.parseEther("10"));
 
             await template.setup(
                 [user1.address, user2.address, user3.address],
@@ -287,16 +336,20 @@ describe("Safe", async () => {
                 AddressZero,
             );
 
-            await expect(await hre.ethers.provider.getBalance(template.address)).to.be.deep.eq(parseEther("0"));
-            await expect(userBalance.lt(await hre.ethers.provider.getBalance(user1.address))).to.be.true;
+            await expect(await hre.ethers.provider.getBalance(templateAddress)).to.eq(ethers.parseEther("0"));
+            await expect(userBalance < (await hre.ethers.provider.getBalance(user1.address))).to.be.true;
         });
 
         it("should work with ether payment to account", async () => {
-            const { template, handler } = await setupTests();
-            const payment = parseEther("10");
-            await user1.sendTransaction({ to: template.address, value: payment });
+         const {
+                template,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
+            const payment = ethers.parseEther("10");
+            await user1.sendTransaction({ to: templateAddress, value: payment });
             const userBalance = await hre.ethers.provider.getBalance(user2.address);
-            await expect(await hre.ethers.provider.getBalance(template.address)).to.be.deep.eq(parseEther("10"));
+            await expect(await hre.ethers.provider.getBalance(templateAddress)).to.eq(ethers.parseEther("10"));
 
             await template.setup(
                 [user1.address, user2.address, user3.address],
@@ -309,14 +362,19 @@ describe("Safe", async () => {
                 user2.address,
             );
 
-            await expect(await hre.ethers.provider.getBalance(template.address)).to.be.deep.eq(parseEther("0"));
-            await expect(await hre.ethers.provider.getBalance(user2.address)).to.be.deep.eq(userBalance.add(payment));
+            await expect(await hre.ethers.provider.getBalance(templateAddress)).to.eq(ethers.parseEther("0"));
+            await expect(await hre.ethers.provider.getBalance(user2.address)).to.eq(userBalance + payment);
 
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
         });
 
         it("should fail if token payment fails", async () => {
-            const { template, mock } = await setupTests();
+            const {
+                template,
+                mock,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const mockAddress = await mock.getAddress();
             const payment = 133742;
 
             const transferData = encodeTransfer(user1.address, payment);
@@ -328,7 +386,7 @@ describe("Safe", async () => {
                     AddressZero,
                     "0x",
                     AddressZero,
-                    mock.address,
+                    mockAddress,
                     payment,
                     AddressZero,
                 ),
@@ -336,7 +394,12 @@ describe("Safe", async () => {
         });
 
         it("should work with token payment to deployer", async () => {
-            const { template, mock, handler } = await setupTests();
+            const {
+                template,
+                mock,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const mockAddress = await mock.getAddress();
             const payment = 133742;
 
             const transferData = encodeTransfer(user1.address, payment);
@@ -346,19 +409,26 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                handler,
-                mock.address,
+
+                AddressZero,
+                mockAddress,
                 payment,
                 AddressZero,
             );
 
-            expect(await mock.callStatic.invocationCountForCalldata(transferData)).to.be.deep.equals(BigNumber.from(1));
+            expect(await mock.invocationCountForCalldata.staticCall(transferData)).to.eq(1n);
 
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
         });
 
         it("should work with token payment to account", async () => {
-            const { template, mock, handler } = await setupTests();
+            const {
+                template,
+                mock,
+                signers: [user1, user2, user3],
+            } = await setupTests();
+            const mockAddress = await mock.getAddress();
+
             const payment = 133742;
 
             const transferData = encodeTransfer(user2.address, payment);
@@ -368,19 +438,24 @@ describe("Safe", async () => {
                 2,
                 AddressZero,
                 "0x",
-                handler,
-                mock.address,
+
+                AddressZero,
+                mockAddress,
+
                 payment,
                 user2.address,
             );
 
-            expect(await mock.callStatic.invocationCountForCalldata(transferData)).to.be.deep.equals(BigNumber.from(1));
+            expect(await mock.invocationCountForCalldata.staticCall(transferData)).to.eq(1n);
 
             await expect(await template.getOwners()).to.be.deep.eq([user1.address, user2.address, user3.address]);
         });
 
         it("should revert if the initializer address does not contain code", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1, user2],
+            } = await setupTests();
 
             await expect(
                 template.setup([user1.address], 1, user2.address, "0xbeef73", AddressZero, AddressZero, 0, AddressZero),
@@ -388,10 +463,14 @@ describe("Safe", async () => {
         });
 
         it("should fail if tried to set the fallback handler address to self", async () => {
-            const { template } = await setupTests();
+            const {
+                template,
+                signers: [user1],
+            } = await setupTests();
+            const templateAddress = await template.getAddress();
 
             await expect(
-                template.setup([user1.address], 1, AddressZero, "0x", template.address, AddressZero, 0, AddressZero),
+                template.setup([user1.address], 1, AddressZero, "0x", templateAddress, AddressZero, 0, AddressZero),
             ).to.be.revertedWith("GS400");
         });
     });

@@ -19,7 +19,6 @@
 - `GS024`: `Invalid contract signature provided`
 - `GS025`: `Hash has not been approved`
 - `GS026`: `Invalid owner provided`
-- `GS027`: `Data Hash and hash of the pre-image data do not match`
 
 ### General auth related
 - `GS030`: `Only owners can approve a hash`
@@ -43,7 +42,8 @@
 - `GS205`: `Invalid prevOwner, owner pair provided`
 
 ### Guard management related
-- `GS300`: `Guard does not implement IERC165`
+- `GS300`: `Transaction Guard does not implement IERC165`
+- `GS301`: `Module Guard does not implement IERC165`
 
 ### Fallback handler related
 - `GS400`: `Fallback handler cannot be set to self`

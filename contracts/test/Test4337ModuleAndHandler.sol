@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
+/* solhint-disable one-contract-per-file */
 pragma solidity >=0.7.0 <0.9.0;
 pragma abicoder v2;
-
-import "../../libraries/SafeStorage.sol";
 
 struct UserOperation {
     address sender;
@@ -19,6 +18,8 @@ struct UserOperation {
 }
 
 interface ISafe {
+    function enableModule(address module) external;
+
     function execTransactionFromModule(address to, uint256 value, bytes memory data, uint8 operation) external returns (bool success);
 }
 
@@ -26,15 +27,15 @@ interface ISafe {
 ///      ⚠️ ⚠️ ⚠️ DO NOT USE IN PRODUCTION ⚠️ ⚠️ ⚠️
 ///      The module does not perform ANY validation, it just executes validateUserOp and execTransaction
 ///      to perform the opcode level compliance by the bundler.
-contract Test4337ModuleAndHandler is SafeStorage {
-    address public immutable myAddress;
-    address public immutable entryPoint;
+contract Test4337ModuleAndHandler {
+    address public immutable MY_ADDRESS;
+    address public immutable ENTRYPOINT;
 
     address internal constant SENTINEL_MODULES = address(0x1);
 
     constructor(address entryPointAddress) {
-        entryPoint = entryPointAddress;
-        myAddress = address(this);
+        ENTRYPOINT = entryPointAddress;
+        MY_ADDRESS = address(this);
     }
 
     function validateUserOp(UserOperation calldata userOp, bytes32, uint256 missingAccountFunds) external returns (uint256 validationData) {
@@ -42,7 +43,7 @@ contract Test4337ModuleAndHandler is SafeStorage {
         ISafe senderSafe = ISafe(safeAddress);
 
         if (missingAccountFunds != 0) {
-            senderSafe.execTransactionFromModule(entryPoint, missingAccountFunds, "", 0);
+            senderSafe.execTransactionFromModule(ENTRYPOINT, missingAccountFunds, "", 0);
         }
 
         return 0;
@@ -55,11 +56,6 @@ contract Test4337ModuleAndHandler is SafeStorage {
     }
 
     function enableMyself() public {
-        require(myAddress != address(this), "You need to DELEGATECALL, sir");
-
-        // Module cannot be added twice.
-        require(modules[myAddress] == address(0), "GS102");
-        modules[myAddress] = modules[SENTINEL_MODULES];
-        modules[SENTINEL_MODULES] = myAddress;
+        ISafe(address(this)).enableModule(MY_ADDRESS);
     }
 }
