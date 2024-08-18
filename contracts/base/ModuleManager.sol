@@ -26,6 +26,7 @@ interface IModuleGuard is IERC165 {
         uint256 value,
         bytes memory data,
         Enum.Operation operation,
+        bytes memory context,
         address module
     ) external returns (bytes32 moduleTxHash);
 
@@ -88,6 +89,7 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
      * @param value Ether value of module transaction.
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction.
+     * @param context Context of the module transaction.
      * @return guard Guard to be used for checking.
      * @return guardHash Hash returned from the guard tx check.
      */
@@ -95,16 +97,17 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         address to,
         uint256 value,
         bytes memory data,
-        Enum.Operation operation
+        Enum.Operation operation,
+        bytes calldata context
     ) internal returns (address guard, bytes32 guardHash) {
-        onBeforeExecTransactionFromModule(to, value, data, operation);
+        onBeforeExecTransactionFromModule(to, value, data, operation, context);
         guard = getModuleGuard();
 
         // Only whitelisted modules are allowed.
         require(msg.sender != SENTINEL_MODULES && modules[msg.sender] != address(0), "GS104");
 
         if (guard != address(0)) {
-            guardHash = IModuleGuard(guard).checkModuleTransaction(to, value, data, operation, msg.sender);
+            guardHash = IModuleGuard(guard).checkModuleTransaction(to, value, data, operation, context, msg.sender);
         }
     }
 
@@ -155,9 +158,32 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         address to,
         uint256 value,
         bytes memory data,
+        Enum.Operation operation,
+        bytes calldata context
+    ) external override returns (bool success) {
+        success = _execTransactionFromModule(to, value, data, operation, context);
+    }
+
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
         Enum.Operation operation
     ) external override returns (bool success) {
-        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
+        success = _execTransactionFromModule(to, value, data, operation, "");
+    }
+
+    function _execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        bytes calldata context
+    ) internal returns (bool success) {
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation, context);
         success = execute(to, value, data, operation, type(uint256).max);
         postModuleExecution(guard, guardHash, success);
 
@@ -172,7 +198,30 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         bytes memory data,
         Enum.Operation operation
     ) external override returns (bool success, bytes memory returnData) {
-        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
+        (success, returnData) = _execTransactionFromModuleReturnData(to, value, data, operation, "");
+    }
+
+    /**
+     * @inheritdoc IModuleManager
+     */
+    function execTransactionFromModuleReturnData(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        bytes calldata context
+    ) external override returns (bool success, bytes memory returnData) {
+        (success, returnData) = _execTransactionFromModuleReturnData(to, value, data, operation, context);
+    }
+
+    function _execTransactionFromModuleReturnData(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        bytes calldata context
+    ) internal returns (bool success, bytes memory returnData) {
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation, context);
         success = execute(to, value, data, operation, type(uint256).max);
         /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
@@ -288,5 +337,11 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction.
      */
-    function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal virtual {}
+    function onBeforeExecTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation,
+        bytes calldata context
+    ) internal virtual {}
 }
