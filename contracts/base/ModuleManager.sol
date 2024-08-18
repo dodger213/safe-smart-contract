@@ -160,6 +160,7 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
         success = execute(to, value, data, operation, type(uint256).max);
         postModuleExecution(guard, guardHash, success);
+
     }
 
     /**
