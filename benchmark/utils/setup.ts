@@ -12,6 +12,7 @@ import {
 } from "../../src/utils/execution";
 import { AddressZero } from "@ethersproject/constants";
 import { Safe, SafeL2 } from "../../typechain-types";
+import { sign } from "crypto";
 
 type SafeSingleton = Safe | SafeL2;
 
@@ -30,8 +31,9 @@ const generateTarget = async (owners: number, threshold: number, guardAddress: s
         fallbackHandler: fallbackHandlerAddress,
         logGasUsage,
         saltNumber,
-    });
-    await executeContractCallWithSigners(safe, safe, "setGuard", [guardAddress], signers);
+
+    );
+    await executeContractCallWithSigners(safe, safe, "setGuard", [guardAddress], signers.slice(0, threshold));
     return safe;
 };
 
