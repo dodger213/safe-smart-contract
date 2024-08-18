@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre, { deployments, ethers } from "hardhat";
 import { BigNumberish } from "ethers";
-import { getTokenCallbackHandler, getSafeWithOwners } from "../../test/utils/setup";
+import { getTokenCallbackHandler, getSafe } from "../../test/utils/setup";
 import {
     logGas,
     executeTx,
@@ -12,6 +12,7 @@ import {
 } from "../../src/utils/execution";
 import { AddressZero } from "@ethersproject/constants";
 import { Safe, SafeL2 } from "../../typechain-types";
+import { sign } from "crypto";
 
 type SafeSingleton = Safe | SafeL2;
 
@@ -24,14 +25,15 @@ const generateTarget = async (owners: number, threshold: number, guardAddress: s
     const fallbackHandler = await getTokenCallbackHandler();
     const fallbackHandlerAddress = await fallbackHandler.getAddress();
     const signers = (await ethers.getSigners()).slice(0, owners);
-    const safe = await getSafeWithOwners(
-        signers.map((owner) => owner.address),
+    const safe = await getSafe({
+        owners: signers.map((owner) => owner.address),
         threshold,
-        fallbackHandlerAddress,
+        fallbackHandler: fallbackHandlerAddress,
         logGasUsage,
         saltNumber,
+
     );
-    await executeContractCallWithSigners(safe, safe, "setGuard", [guardAddress], signers);
+    await executeContractCallWithSigners(safe, safe, "setGuard", [guardAddress], signers.slice(0, threshold));
     return safe;
 };
 

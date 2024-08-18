@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre, { ethers, deployments } from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
-import { getSafeWithSingleton, getSafeSingletonAt, getMock } from "../utils/setup";
+import { getSafe, getSafeSingletonAt, getMock } from "../utils/setup";
 import deploymentData from "../json/safeDeployment.json";
 import safeRuntimeBytecode from "../json/safeRuntimeBytecode.json";
 import {
@@ -16,9 +16,11 @@ const SAFE_SINGLETON_141_ADDRESS = "0x3E5c63644E683549055b9Be8653de26E0B4CD36E";
 
 const SAFE_SINGLETON_141_L2_ADDRESS = "0xfb1bffC9d739B8D520DaF37dF666da4C687191EA";
 
+
 const SAFE_SINGLETON_150_L2_ADDRESS = "0x551A2F9a71bF88cDBef3CBe60E95722f38eE0eAA";
 
 const COMPATIBILITY_FALLBACK_HANDLER_150 = "0x4c95c836D31d329d80d696cb679f3dEa028Ad4e5";
+
 
 const FALLBACK_HANDLER_STORAGE_SLOT = "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5";
 
@@ -52,8 +54,10 @@ describe("SafeToL2Migration library", () => {
         const singleton130 = await getSafeSingletonAt(singleton130Address);
         const singleton141 = await getSafeSingletonAt(SAFE_SINGLETON_141_ADDRESS);
 
+
         const guardContract = await hre.ethers.getContractAt("ITransactionGuard", AddressZero);
         const guardEip165Calldata = guardContract.interface.encodeFunctionData("supportsInterface", ["0xe6d7a83a"]);
+
         const validGuardMock = await getMock();
         await validGuardMock.givenCalldataReturnBool(guardEip165Calldata, true);
 
@@ -83,9 +87,12 @@ describe("SafeToL2Migration library", () => {
         const safeToL2MigrationContract = await hre.ethers.getContractFactory("SafeToL2Migration");
         const migration = await safeToL2MigrationContract.deploy();
         return {
-            safe111: await getSafeWithSingleton(singleton111, [user1.address]),
-            safe130: await getSafeWithSingleton(singleton130, [user1.address]),
-            safe141: await getSafeWithSingleton(singleton141, [user1.address]),
+
+
+            safe111: await getSafe({ singleton: singleton111, owners: [user1.address] }),
+            safe130: await getSafe({ singleton: singleton130, owners: [user1.address] }),
+            safe141: await getSafe({ singleton: singleton141, owners: [user1.address] }),
+
             safeWith1967Proxy,
             migration,
             signers,

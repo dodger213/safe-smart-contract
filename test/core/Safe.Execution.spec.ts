@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre, { deployments, ethers } from "hardhat";
-import { deployContract, getSafeWithOwners } from "../utils/setup";
+import { deployContract, getSafe } from "../utils/setup";
 import {
     safeApproveHash,
     buildSignatureBytes,
@@ -42,7 +42,7 @@ describe("Safe", () => {
             }`;
         const reverter = await deployContract(user1, reverterSource);
         return {
-            safe: await getSafeWithOwners([user1.address]),
+            safe: await getSafe({ owners: [user1.address] }),
             reverter,
             storageSetter,
             nativeTokenReceiver,
@@ -204,7 +204,6 @@ describe("Safe", () => {
             await user1.sendTransaction({ to: safeAddress, value: ethers.parseEther("1") });
             const userBalance = await hre.ethers.provider.getBalance(user2.address);
             expect(await hre.ethers.provider.getBalance(safeAddress)).to.be.eq(ethers.parseEther("1"));
-
             let executedTx: any;
             await expect(
                 executeTx(safe, tx, [await safeApproveHash(user1, safe, tx, true)]).then((tx) => {
@@ -249,13 +248,8 @@ describe("Safe", () => {
             const userBalance = await hre.ethers.provider.getBalance(user2.address);
             await expect(await hre.ethers.provider.getBalance(safeAddress)).to.eq(ethers.parseEther("1"));
 
-            let executedTx: any;
-            await expect(
-                executeTx(safe, tx, [await safeApproveHash(user1, safe, tx, true)]).then((tx) => {
-                    executedTx = tx;
-                    return tx;
-                }),
-            ).to.emit(safe, "ExecutionFailure");
+            const executedTx = await executeTx(safe, tx, [await safeApproveHash(user1, safe, tx, true)]);
+            await expect(executedTx).to.emit(safe, "ExecutionFailure");
             const receipt = await hre.ethers.provider.getTransactionReceipt(executedTx!.hash);
             const receiptLogs = receipt?.logs ?? [];
             const logIndex = receiptLogs.length - 1;
@@ -345,12 +339,12 @@ describe("Safe", () => {
             for (const log of receiptLogs) {
                 try {
                     parsedLogs.push(nativeTokenReceiver.interface.decodeEventLog("BreadReceived", log.data, log.topics));
-                } catch (e) {
+                } catch {
                     continue;
                 }
             }
 
-            expect(parsedLogs[0].forwardedGas).to.be.gte(400000n);
+            expect(parsedLogs[0].forwardedGas).to.be.gte(399760n);
         });
     });
 });

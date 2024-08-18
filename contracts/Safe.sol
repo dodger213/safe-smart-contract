@@ -15,6 +15,8 @@ import {ISignatureValidator, ISignatureValidatorConstants} from "./interfaces/IS
 import {SafeMath} from "./external/SafeMath.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 
+import "./SafeBytecode.sol";
+
 /**
  * @title Safe - A multisignature wallet with support for confirmations using signed messages based on EIP-712.
  * @dev Most important concepts:
@@ -69,13 +71,24 @@ contract Safe is
     mapping(address => mapping(bytes32 => uint256)) public override approvedHashes;
 
     // This constructor ensures that this contract can only be used as a singleton for Proxy contracts
-    constructor() {
+    constructor(address byteCode) {
         /**
          * By setting the threshold it is not possible to call setup anymore,
          * so we create a Safe with 0 owners and threshold 1.
          * This is an unusable Safe, perfect for the singleton
          */
         threshold = 1;
+
+        if (byteCode != address(0)) {
+            bytes memory code = SafeBytecode(byteCode).DEPLOYED_BYTECODE();
+
+            /* solhint-disable no-inline-assembly */
+            /// @solidity memory-safe-assembly
+            assembly {
+                return(add(code, 32), mload(code))
+            }
+            /* solhint-enable no-inline-assembly */
+        }
     }
 
     /**
@@ -227,8 +240,14 @@ contract Safe is
      * @param dataHash Hash of the data (could be either a message hash or transaction hash)
      * @param signatures Signature data that should be verified.
      * @param offset Offset to the start of the contract signature in the signatures byte array
+     * @return newOffset The new offset that points to the end of the contract signature
      */
-    function checkContractSignature(address owner, bytes32 dataHash, bytes memory signatures, uint256 offset) internal view {
+    function checkContractSignature(
+        address owner,
+        bytes32 dataHash,
+        bytes memory signatures,
+        uint256 offset
+    ) internal view returns (uint256 newOffset) {
         // Check that signature data pointer (s) is in bounds (points to the length of data -> 32 bytes)
         if (offset.add(32) > signatures.length) revertWithError("GS022");
 
@@ -239,8 +258,9 @@ contract Safe is
         assembly {
             contractSignatureLen := mload(add(add(signatures, offset), 0x20))
         }
+        newOffset = offset.add(32).add(contractSignatureLen);
         /* solhint-enable no-inline-assembly */
-        if (offset.add(32).add(contractSignatureLen) > signatures.length) revertWithError("GS023");
+        if (newOffset > signatures.length) revertWithError("GS023");
 
         // Check signature
         bytes memory contractSignature;
@@ -275,8 +295,9 @@ contract Safe is
         bytes memory signatures,
         uint256 requiredSignatures
     ) public view override {
+        uint256 offset = requiredSignatures.mul(65);
         // Check that the provided signature data is not too short
-        if (signatures.length < requiredSignatures.mul(65)) revertWithError("GS020");
+        if (signatures.length < offset) revertWithError("GS020");
         // There cannot be an owner with address 0.
         address lastOwner = address(0);
         address currentOwner;
@@ -291,16 +312,14 @@ contract Safe is
                 // When handling contract signatures the address of the contract is encoded into r
                 currentOwner = address(uint160(uint256(r)));
 
-                // Check that signature data pointer (s) is not pointing inside the static part of the signatures bytes
-                // This check is not completely accurate, since it is possible that more signatures than the threshold are send.
-                // Here we only check that the pointer is not pointing inside the part that is being processed
-                if (uint256(s) < requiredSignatures.mul(65)) revertWithError("GS021");
+                // Require that the signature data pointer is pointing to the expected location, at the end of processed contract signatures.
+                if (uint256(s) != offset) revertWithError("GS021");
 
                 // The contract signature check is extracted to a separate function for better compatibility with formal verification
                 // A quote from the Certora team:
                 // "The assembly code broke the pointer analysis, which switched the prover in failsafe mode, where it is (a) much slower and (b) computes different hashes than in the normal mode."
                 // More info here: https://github.com/safe-global/safe-smart-account/pull/661
-                checkContractSignature(currentOwner, dataHash, signatures, uint256(s));
+                offset = checkContractSignature(currentOwner, dataHash, signatures, uint256(s));
             } else if (v == 1) {
                 // If v is 1 then it is an approved hash
                 // When handling approved hashes the address of the approver is encoded into r
@@ -320,6 +339,9 @@ contract Safe is
                 revertWithError("GS026");
             lastOwner = currentOwner;
         }
+        // if the signature is longer than the offset, it means that there are extra bytes not used in the signature
+        // A side effect of this check is that it will fail if the signatures count sent in the transaction is more than the required threshold
+        if (signatures.length != offset) revertWithError("GS028");
     }
 
     /**
@@ -446,6 +468,7 @@ contract Safe is
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction.
      * @param success Boolean flag indicating if the call succeeded.
+
      */
     function onBeforeExecTransaction(
         address to,
@@ -459,5 +482,6 @@ contract Safe is
         address payable refundReceiver,
         bytes memory signatures,
         bool success
+
     ) internal virtual {}
 }

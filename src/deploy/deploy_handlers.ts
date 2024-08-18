@@ -13,6 +13,13 @@ const deploy: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
         deterministicDeployment: true,
     });
 
+    await deploy("SafeFallbackHandler", {
+        from: deployer,
+        args: [],
+        log: true,
+        deterministicDeployment: true,
+    });
+
     await deploy("CompatibilityFallbackHandler", {
         from: deployer,
         args: [],

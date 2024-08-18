@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre, { deployments, ethers } from "hardhat";
-import { deployContract, getSafeWithOwners } from "../utils/setup";
+import { deployContract, getSafe } from "../utils/setup";
 
 describe("Safe", () => {
     const setupTests = deployments.createFixture(async ({ deployments }) => {
@@ -21,7 +21,7 @@ describe("Safe", () => {
         const signers = await ethers.getSigners();
         const [user1] = signers;
         return {
-            safe: await getSafeWithOwners([user1.address]),
+            safe: await getSafe({ owners: [user1.address] }),
             caller: await deployContract(user1, source),
             signers,
         };
@@ -78,6 +78,7 @@ describe("Safe", () => {
         });
 
         it("should throw for incoming eth with data", async () => {
+
             const {
                 safe,
                 signers: [user1],
@@ -85,6 +86,7 @@ describe("Safe", () => {
             const safeAddress = await safe.getAddress();
 
             await expect(user1.sendTransaction({ to: safeAddress, value: 23, data: "0xbaddad" })).to.be.reverted;
+
         });
     });
 });

@@ -6,8 +6,6 @@ import {Safe, Enum} from "./Safe.sol";
 // Imports are required for NatSpec validation of the compiler, and falsely detected as unused by
 // the linter, so disable the `no-unused-imports` rule for the next line.
 // solhint-disable-next-line no-unused-import
-import {ISafe} from "./interfaces/ISafe.sol";
-// solhint-disable-next-line no-unused-import
 import {ModuleManager} from "./base/ModuleManager.sol";
 
 /**
@@ -50,6 +48,7 @@ contract SafeL2 is Safe {
         address payable refundReceiver,
         bytes memory signatures,
         bool /*success*/
+
     ) internal override {
         bytes memory additionalInfo;
         {
@@ -72,8 +71,11 @@ contract SafeL2 is Safe {
 
     /**
      * @inheritdoc ModuleManager
+
      */
     function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal override {
+
         emit SafeModuleTransaction(msg.sender, to, value, data, operation);
+
     }
 }

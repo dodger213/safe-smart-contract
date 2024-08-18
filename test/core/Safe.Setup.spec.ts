@@ -9,6 +9,7 @@ import { chainId, encodeTransfer } from "../utils/encoding";
 
 describe("Safe", () => {
     const setupTests = deployments.createFixture(async ({ deployments }) => {
+
         await deployments.fixture();
         const signers = await ethers.getSigners();
         return {
@@ -50,18 +51,20 @@ describe("Safe", () => {
         });
 
         it("should set domain hash", async () => {
+
             const {
                 template,
                 signers: [user1, user2, user3],
             } = await setupTests();
             const templateAddress = await template.getAddress();
+
             await expect(
                 template.setup(
                     [user1.address, user2.address, user3.address],
                     2,
                     AddressZero,
                     "0x",
-                    AddressZero,
+                    handler,
                     AddressZero,
                     0,
                     AddressZero,
@@ -160,7 +163,7 @@ describe("Safe", () => {
             } = await setupTests();
             await expect(
                 template.setup([user2.address, user2.address], 2, AddressZero, "0x", AddressZero, AddressZero, 0, AddressZero),
-            ).to.be.revertedWith("GS203");
+            ).to.be.revertedWith("GS204");
         });
 
         it("should revert if threshold is too high", async () => {
@@ -233,7 +236,7 @@ describe("Safe", () => {
                     2,
                     testIntializerAddress,
                     initData,
-                    AddressOne,
+                    handler,
                     AddressZero,
                     0,
                     AddressZero,
@@ -246,8 +249,12 @@ describe("Safe", () => {
             await expect(await template.getThreshold()).to.eq(2n);
 
             await expect(
-                await hre.ethers.provider.getStorage(templateAddress, "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5"),
-            ).to.be.eq("0x" + "1".padStart(64, "0"));
+                await hre.ethers.provider.getStorageAt(
+                    template.address,
+                    "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5",
+                ),
+            ).to.be.eq(hre.ethers.utils.hexZeroPad(handler.toLowerCase(), 32));
+              
 
             await expect(
                 await hre.ethers.provider.getStorage(templateAddress, "0x4242424242424242424242424242424242424242424242424242424242424242"),
@@ -314,6 +321,7 @@ describe("Safe", () => {
             const templateAddress = await template.getAddress();
             const payment = ethers.parseEther("10");
             await user1.sendTransaction({ to: templateAddress, value: payment });
+
             const userBalance = await hre.ethers.provider.getBalance(user1.address);
             await expect(await hre.ethers.provider.getBalance(templateAddress)).to.eq(ethers.parseEther("10"));
 
@@ -322,7 +330,7 @@ describe("Safe", () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 AddressZero,
                 payment,
                 AddressZero,
@@ -333,7 +341,7 @@ describe("Safe", () => {
         });
 
         it("should work with ether payment to account", async () => {
-            const {
+         const {
                 template,
                 signers: [user1, user2, user3],
             } = await setupTests();
@@ -348,7 +356,7 @@ describe("Safe", () => {
                 2,
                 AddressZero,
                 "0x",
-                AddressZero,
+                handler,
                 AddressZero,
                 payment,
                 user2.address,
@@ -401,6 +409,7 @@ describe("Safe", () => {
                 2,
                 AddressZero,
                 "0x",
+
                 AddressZero,
                 mockAddress,
                 payment,
@@ -419,6 +428,7 @@ describe("Safe", () => {
                 signers: [user1, user2, user3],
             } = await setupTests();
             const mockAddress = await mock.getAddress();
+
             const payment = 133742;
 
             const transferData = encodeTransfer(user2.address, payment);
@@ -428,8 +438,10 @@ describe("Safe", () => {
                 2,
                 AddressZero,
                 "0x",
+
                 AddressZero,
                 mockAddress,
+
                 payment,
                 user2.address,
             );
