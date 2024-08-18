@@ -6,11 +6,6 @@ import {Safe, Enum} from "./Safe.sol";
 // Imports are required for NatSpec validation of the compiler, and falsely detected as unused by
 // the linter, so disable the `no-unused-imports` rule for the next line.
 // solhint-disable-next-line no-unused-import
-import {ISafe} from "./interfaces/ISafe.sol";
-
-// Imports are required for NatSpec validation of the compiler, and falsely detected as unused by
-// the linter, so disable the `no-unused-imports` rule for the next line.
-// solhint-disable-next-line no-unused-import
 import {ModuleManager} from "./base/ModuleManager.sol";
 
 /**
@@ -39,9 +34,9 @@ contract SafeL2 is Safe {
     event SafeModuleTransaction(address module, address to, uint256 value, bytes data, Enum.Operation operation);
 
     /**
-     * @inheritdoc ISafe
+     * @inheritdoc Safe
      */
-    function execTransaction(
+    function onBeforeExecTransaction(
         address to,
         uint256 value,
         bytes calldata data,
@@ -52,7 +47,7 @@ contract SafeL2 is Safe {
         address gasToken,
         address payable refundReceiver,
         bytes memory signatures
-    ) public payable override returns (bool) {
+    ) internal override {
         bytes memory additionalInfo;
         {
             additionalInfo = abi.encode(nonce, msg.sender, threshold);
@@ -70,32 +65,14 @@ contract SafeL2 is Safe {
             signatures,
             additionalInfo
         );
-        return super.execTransaction(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, signatures);
     }
 
     /**
      * @inheritdoc ModuleManager
-     */
-    function _onExecTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) internal override returns (bool success) {
-        emit SafeModuleTransaction(msg.sender, to, value, data, operation);
-        success = super._onExecTransactionFromModule(to, value, data, operation);
-    }
 
-    /**
-     * @inheritdoc ModuleManager
      */
-    function _onExecTransactionFromModuleReturnData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) internal override returns (bool success, bytes memory returnData) {
+    function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal override {
         emit SafeModuleTransaction(msg.sender, to, value, data, operation);
-        return super._onExecTransactionFromModuleReturnData(to, value, data, operation);
+
     }
 }

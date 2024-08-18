@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import hre, { deployments, ethers } from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
-import { getCompatFallbackHandler, getSafeWithOwners } from "../utils/setup";
+import { getCompatFallbackHandler, getSafe } from "../utils/setup";
 import {
     buildSignatureBytes,
     executeContractCallWithSigners,
@@ -21,9 +21,13 @@ describe("CompatibilityFallbackHandler", () => {
         const handlerAddress = await handler.getAddress();
         const signers = await ethers.getSigners();
         const [user1, user2] = signers;
-        const signerSafe = await getSafeWithOwners([user1.address], 1, handlerAddress);
+        const signerSafe = await getSafe({ owners: [user1.address], threshold: 1, fallbackHandler: handlerAddress });
         const signerSafeAddress = await signerSafe.getAddress();
-        const safe = await getSafeWithOwners([user1.address, user2.address, signerSafeAddress], 2, handlerAddress);
+        const safe = await getSafe({
+            owners: [user1.address, user2.address, signerSafeAddress],
+            threshold: 2,
+            fallbackHandler: handlerAddress,
+        });
         const safeAddress = await safe.getAddress();
         const validator = await getCompatFallbackHandler(safeAddress);
         const killLib = await killLibContract(user1);
