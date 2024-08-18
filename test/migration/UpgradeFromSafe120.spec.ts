@@ -12,7 +12,7 @@ describe("Upgrade from Safe 1.2.0", () => {
 
     // We migrate the Safe and run the verification tests
     const setupTests = deployments.createFixture(async ({ deployments }) => {
-        await deployments.fixture();
+        const { SafeFallbackHandler } = await deployments.fixture();
         const mock = await getMock();
         const mockAddress = await mock.getAddress();
         const [user1] = await ethers.getSigners();
@@ -23,7 +23,7 @@ describe("Upgrade from Safe 1.2.0", () => {
         const factory = await getFactory();
         const saltNonce = 42;
         const proxyAddress = await calculateProxyAddress(factory, singleton120, "0x", saltNonce);
-        await factory.createProxyWithNonce(singleton120, "0x", saltNonce).then((tx: any) => tx.wait());
+        await factory.createProxyWithNonce(singleton120, "0x", saltNonce).then((tx) => tx.wait());
 
         const safe = await hre.ethers.getContractAt("Safe", proxyAddress);
         await safe.setup([user1.address], 1, AddressZero, "0x", mockAddress, AddressZero, 0, AddressZero);
@@ -39,6 +39,7 @@ describe("Upgrade from Safe 1.2.0", () => {
             migratedSafe: safe,
             mock,
             multiSend: await getMultiSend(),
+            handler: SafeFallbackHandler.address,
         };
     });
 

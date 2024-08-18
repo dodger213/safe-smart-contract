@@ -9,6 +9,7 @@ interface TestSetup {
     migratedSafe: Safe;
     mock: MockContract;
     multiSend: MultiSend;
+
 }
 
 export const verificationTests = async (setupTests: () => Promise<TestSetup>) => {
@@ -35,6 +36,7 @@ export const verificationTests = async (setupTests: () => Promise<TestSetup>) =>
     describe("addOwner", () => {
         it("should add owner and change threshold", async () => {
             const { migratedSafe } = await setupTests();
+
 
             await expect(executeContractCallWithSigners(migratedSafe, migratedSafe, "addOwnerWithThreshold", [user2.address, 2], [user1]))
                 .to.emit(migratedSafe, "AddedOwner")
@@ -64,7 +66,6 @@ export const verificationTests = async (setupTests: () => Promise<TestSetup>) =>
         it("should enabled module and be able to use it", async () => {
             const { migratedSafe, mock } = await setupTests();
             const mockAddress = await mock.getAddress();
-
             await expect(executeContractCallWithSigners(migratedSafe, migratedSafe, "enableModule", [user2.address], [user1]))
                 .to.emit(migratedSafe, "EnabledModule")
                 .withArgs(user2.address);

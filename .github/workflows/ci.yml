@@ -1,14 +1,14 @@
 name: safe-smart-account
 on: [push, pull_request]
 env:
-    NODE_VERSION: 18.17.1
+    NODE_VERSION: 20.16.0
 
 jobs:
     lint-solidity:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v2
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
               with:
                   node-version: ${{ env.NODE_VERSION }}
                   cache: "npm"
@@ -19,8 +19,8 @@ jobs:
     lint-typescript:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v2
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
               with:
                   node-version: ${{ env.NODE_VERSION }}
                   cache: "npm"
@@ -37,8 +37,8 @@ jobs:
         env:
             SAFE_CONTRACT_UNDER_TEST: ${{ matrix.contract-name }}
         steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v2
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
               with:
                   node-version: ${{ env.NODE_VERSION }}
                   cache: "npm"
@@ -71,13 +71,13 @@ jobs:
                 solidity: ["0.7.6", "0.8.24"]
                 include:
                     - solidity: "0.8.24"
-                      settings: '{"viaIR":true,"optimizer":{"enabled":true,"runs":1000000}}'
+                      settings: '{"viaIR":false,"optimizer":{"enabled":true,"runs":1000000}}'
         env:
             SOLIDITY_VERSION: ${{ matrix.solidity }}
             SOLIDITY_SETTINGS: ${{ matrix.settings }}
         steps:
-            - uses: actions/checkout@v2
-            - uses: actions/setup-node@v2
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
               with:
                   node-version: ${{ env.NODE_VERSION }}
                   cache: "npm"

@@ -41,4 +41,23 @@ abstract contract Executor {
             /* solhint-enable no-inline-assembly */
         }
     }
+
+    function executeInlineGas(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) internal returns (bool success) {
+        if (operation == Enum.Operation.DelegateCall) {
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                success := delegatecall(gas(), to, add(data, 0x20), mload(data), 0, 0)
+            }
+        } else {
+            // solhint-disable-next-line no-inline-assembly
+            assembly {
+                success := call(gas(), to, value, add(data, 0x20), mload(data), 0, 0)
+            }
+        }
+    }
 }
