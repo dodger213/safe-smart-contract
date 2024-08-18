@@ -21,18 +21,19 @@ methods {
 definition reachableOnly(method f) returns bool =
     f.selector != sig:simulateAndRevert(address,bytes).selector;
 
-ghost reach(address, address) returns bool {
+persistent ghost reach(address, address) returns bool {
     init_state axiom forall address X. forall address Y. reach(X, Y) == (X == Y || to_mathint(Y) == 0);
 }
 
-ghost mapping(address => address) ghostModules {
+persistent ghost mapping(address => address) ghostModules {
     init_state axiom forall address X. to_mathint(ghostModules[X]) == 0;
 }
 
-ghost address SENTINEL {
+persistent ghost address SENTINEL {
     axiom to_mathint(SENTINEL) == 1;    
 }
-ghost address NULL {
+
+persistent ghost address NULL {
     axiom to_mathint(NULL) == 0;    
 }
 
@@ -156,7 +157,7 @@ definition updateSucc(address a, address b) returns bool = forall address X. for
 // hook to update the ghostModules and the reach ghost state whenever the modules field
 // in storage is written. 
 // This also checks that the reach_succ invariant is preserved. 
-hook Sstore currentContract.modules[KEY address key] address value STORAGE {
+hook Sstore currentContract.modules[KEY address key] address value {
     address valueOrNull;
     address someKey;
     require reach_succ(someKey, ghostModules[someKey]);
@@ -170,7 +171,7 @@ hook Sstore currentContract.modules[KEY address key] address value STORAGE {
 
 // Hook to match ghost state and storage state when reading modules from storage. 
 // This also provides the reach_succ invariant. 
-hook Sload address value currentContract.modules[KEY address key] STORAGE {
+hook Sload address value currentContract.modules[KEY address key] {
     require ghostModules[key] == value;
     require reach_succ(key, value);
 }

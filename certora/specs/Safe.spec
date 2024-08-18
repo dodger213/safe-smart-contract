@@ -17,7 +17,7 @@ methods {
     function execTransactionFromModule(address,uint256,bytes,Enum.Operation) external returns (bool);
     function execTransaction(address,uint256,bytes,Enum.Operation,uint256,uint256,uint256,address,address,bytes) external returns (bool);
 
-    function checkSignatures(bytes32, bytes memory, bytes memory) internal => NONDET;
+    function checkSignatures(bytes32, bytes memory) internal => NONDET;
 }
 
 definition reachableOnly(method f) returns bool =
@@ -50,33 +50,33 @@ rule nonceMonotonicity(method f) filtered {
 
 
 // The singleton is a private variable, so we need to use a ghost variable to track it.
-ghost address ghostSingletonAddress {
+persistent ghost address ghostSingletonAddress {
     init_state axiom ghostSingletonAddress == 0;
 }
 
-hook Sstore SafeHarness.(slot 0) address newSingletonAddress STORAGE {
+hook Sstore SafeHarness.(slot 0) address newSingletonAddress {
     ghostSingletonAddress = newSingletonAddress;
 }
 
 // This is EIP-1967's singleton storage slot:
 // 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
 // converted to decimal because certora doesn't seem to support hex yet.
-hook Sstore SafeHarness.(slot 24440054405305269366569402256811496959409073762505157381672968839269610695612) address newSingletonAddress STORAGE {
+hook Sstore SafeHarness.(slot 24440054405305269366569402256811496959409073762505157381672968839269610695612) address newSingletonAddress {
     ghostSingletonAddress = newSingletonAddress;
 }
 
-invariant sigletonAddressNeverChanges()
+invariant singletonAddressNeverChanges()
     ghostSingletonAddress == 0
     filtered { f -> reachableOnly(f) && f.selector != sig:getStorageAt(uint256,uint256).selector }
 
-ghost address fallbackHandlerAddress {
+persistent ghost address fallbackHandlerAddress {
     init_state axiom fallbackHandlerAddress == 0;
 }
 
 // This is Safe's fallback handler storage slot:
 // 0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5
 // converted to decimal because certora doesn't seem to support hex yet.
-hook Sstore SafeHarness.(slot 49122629484629529244014240937346711770925847994644146912111677022347558721749) address newFallbackHandlerAddress STORAGE {
+hook Sstore SafeHarness.(slot 49122629484629529244014240937346711770925847994644146912111677022347558721749) address newFallbackHandlerAddress {
     fallbackHandlerAddress = newFallbackHandlerAddress;
 }
 

@@ -3,18 +3,8 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import {SafeStorage} from "../libraries/SafeStorage.sol";
-import {Enum} from "../common/Enum.sol";
-
-interface ISafe {
-    // solhint-disable-next-line
-    function VERSION() external view returns (string memory);
-
-    function setFallbackHandler(address handler) external;
-
-    function getOwners() external view returns (address[] memory);
-
-    function getThreshold() external view returns (uint256);
-}
+import {Enum} from "../libraries/Enum.sol";
+import {ISafe} from "../interfaces/ISafe.sol";
 
 /**
  * @title Migration Contract for updating a Safe from 1.1.1/1.3.0/1.4.1 versions to a L2 version. Useful when replaying a Safe from a non L2 network in a L2 network.
@@ -74,7 +64,8 @@ contract SafeToL2Migration is SafeStorage {
         singleton = l2Singleton;
 
         // Encode nonce, sender, threshold
-        bytes memory additionalInfo = abi.encode(nonce - 1, msg.sender, threshold);
+        bytes memory additionalInfo = abi.encode(0, msg.sender, threshold);
+
 
         // Simulate a L2 transaction so Safe Tx Service indexer picks up the Safe
         emit SafeMultiSigTransaction(
@@ -86,7 +77,7 @@ contract SafeToL2Migration is SafeStorage {
             0,
             0,
             address(0),
-            address(0),
+            payable(address(0)),
             "", // We cannot detect signatures
             additionalInfo
         );
@@ -99,15 +90,15 @@ contract SafeToL2Migration is SafeStorage {
      * @dev This function should only be called via a delegatecall to perform the upgrade.
      * Singletons versions will be compared, so it implies that contracts exist
      */
-    function migrateToL2(address l2Singleton) public onlyDelegateCall {
+    function migrateToL2(address l2Singleton) public onlyDelegateCall onlyNonceZero {
         require(address(singleton) != l2Singleton, "Safe is already using the singleton");
-        // Nonce is increased before executing a tx, so first executed tx will have nonce=1
-        require(nonce == 1, "Safe must have not executed any tx");
+
         bytes32 oldSingletonVersion = keccak256(abi.encodePacked(ISafe(singleton).VERSION()));
         bytes32 newSingletonVersion = keccak256(abi.encodePacked(ISafe(l2Singleton).VERSION()));
 
         require(oldSingletonVersion == newSingletonVersion, "L2 singleton must match current version singleton");
-        // There's no way to make sure if address is a valid singleton, unless we cofigure the contract for every chain
+        // There's no way to make sure if address is a valid singleton, unless we configure the contract for every chain
+
         require(
             newSingletonVersion == keccak256(abi.encodePacked("1.3.0")) || newSingletonVersion == keccak256(abi.encodePacked("1.4.1")),
             "Provided singleton version is not supported"
@@ -119,13 +110,16 @@ contract SafeToL2Migration is SafeStorage {
     }
 
     /**
-     * @notice Migrate from Safe 1.1.1 Singleton to 1.3.1 or 1.4.1 L2
+
+     * @notice Migrate from Safe 1.1.1 Singleton to 1.3.0 or 1.4.1 L2
+
      * Safe is required to have nonce 0 so backend can support it after the migration
      * @dev This function should only be called via a delegatecall to perform the upgrade.
      * Singletons version will be checked, so it implies that contracts exist.
      * A valid and compatible fallbackHandler needs to be provided, only existance will be checked.
      */
-    function migrateFromV111(address l2Singleton, address fallbackHandler) public onlyDelegateCall {
+    function migrateFromV111(address l2Singleton, address fallbackHandler) public onlyDelegateCall onlyNonceZero {
+
         require(isContract(fallbackHandler), "fallbackHandler is not a contract");
 
         bytes32 oldSingletonVersion = keccak256(abi.encodePacked(ISafe(singleton).VERSION()));
@@ -158,10 +152,14 @@ contract SafeToL2Migration is SafeStorage {
      */
     function isContract(address account) internal view returns (bool) {
         uint256 size;
-        // solhint-disable-next-line no-inline-assembly
+
+        /* solhint-disable no-inline-assembly */
+        /// @solidity memory-safe-assembly
         assembly {
             size := extcodesize(account)
         }
+        /* solhint-enable no-inline-assembly */
+
 
         // If the code size is greater than 0, it is a contract; otherwise, it is an EOA.
         return size > 0;

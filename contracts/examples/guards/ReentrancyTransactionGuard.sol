@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import {Enum} from "../../common/Enum.sol";
-import {BaseGuard} from "../../base/GuardManager.sol";
+import {Enum} from "../../libraries/Enum.sol";
+import {BaseGuard} from "./BaseGuard.sol";
 
 /**
  * @title ReentrancyTransactionGuard - Prevents reentrancy into the transaction execution function.
@@ -87,5 +87,13 @@ contract ReentrancyTransactionGuard is BaseGuard {
         GuardValue storage guard = getGuard();
         require(!guard.active, "Reentrancy detected");
         guard.active = true;
+    }
+
+    /**
+     * @notice Called by the Safe contract after a module transaction is executed.
+     * @dev Resets the guard value.
+     */
+    function checkAfterModuleExecution(bytes32, bool) external override {
+        getGuard().active = false;
     }
 }

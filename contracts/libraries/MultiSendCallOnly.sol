@@ -24,7 +24,6 @@ contract MultiSendCallOnly {
      */
     function multiSend(bytes memory transactions) public payable {
         /* solhint-disable no-inline-assembly */
-        /// @solidity memory-safe-assembly
         assembly {
             let length := mload(transactions)
             let i := 0x20
@@ -40,6 +39,8 @@ contract MultiSendCallOnly {
                 // We offset the load address by 1 byte (operation byte)
                 // We shift it right by 96 bits (256 - 160 [20 address bytes]) to right-align the data and zero out unused data.
                 let to := shr(0x60, mload(add(transactions, add(i, 0x01))))
+                // Defaults `to` to `address(this)` if `address(0)` is provided.
+                to := or(to, mul(iszero(to), address()))
                 // We offset the load address by 21 byte (operation byte + 20 address bytes)
                 let value := mload(add(transactions, add(i, 0x15)))
                 // We offset the load address by 53 byte (operation byte + 20 address bytes + 32 value bytes)
@@ -56,9 +57,8 @@ contract MultiSendCallOnly {
                     revert(0, 0)
                 }
                 if eq(success, 0) {
-                    let errorLength := returndatasize()
-                    returndatacopy(0, 0, errorLength)
-                    revert(0, errorLength)
+                    returndatacopy(0, 0, returndatasize())
+                    revert(0, returndatasize())
                 }
                 // Next entry starts at 85 byte + data length
                 i := add(i, add(0x55, dataLength))

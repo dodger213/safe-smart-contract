@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
 
-import {Enum} from "../../common/Enum.sol";
-import {BaseGuard} from "../../base/GuardManager.sol";
-import {Safe} from "../../Safe.sol";
-
+import {Enum} from "../../libraries/Enum.sol";
+import {ISafe} from "../../interfaces/ISafe.sol";
+import {BaseGuard} from "./BaseGuard.sol";
 /**
  * @title Debug Transaction Guard - Emits transaction events with extended information.
  * @dev This guard is only meant as a development tool and example
@@ -31,14 +30,7 @@ contract DebugTransactionGuard is BaseGuard {
         address executor
     );
 
-    event ModuleTransasctionDetails(
-        bytes32 indexed txHash,
-        address to,
-        uint256 value,
-        bytes data,
-        Enum.Operation operation,
-        address module
-    );
+    event ModuleTransactionDetails(bytes32 indexed txHash, address to, uint256 value, bytes data, Enum.Operation operation, address module);
 
     event GasUsage(address indexed safe, bytes32 indexed txHash, uint256 indexed nonce, bool success);
 
@@ -75,7 +67,7 @@ contract DebugTransactionGuard is BaseGuard {
         uint256 nonce;
         bytes32 txHash;
         {
-            Safe safe = Safe(payable(msg.sender));
+            ISafe safe = ISafe(payable(msg.sender));
             nonce = safe.nonce() - 1;
             txHash = safe.getTransactionHash(to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, refundReceiver, nonce);
         }
@@ -113,6 +105,12 @@ contract DebugTransactionGuard is BaseGuard {
     ) external override returns (bytes32 moduleTxHash) {
         moduleTxHash = keccak256(abi.encodePacked(to, value, data, operation, module));
 
-        emit ModuleTransasctionDetails(moduleTxHash, to, value, data, operation, module);
+        emit ModuleTransactionDetails(moduleTxHash, to, value, data, operation, module);
     }
+
+    /**
+     * @notice Called by the Safe contract after a module transaction is executed.
+     * @dev No-op.
+     */
+    function checkAfterModuleExecution(bytes32 txHash, bool success) external override {}
 }

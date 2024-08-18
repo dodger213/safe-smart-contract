@@ -24,24 +24,25 @@ definition reachableOnly(method f) returns bool =
 
 definition MAX_UINT256() returns uint256 = 0xffffffffffffffffffffffffffffffff;
 
-ghost reach(address, address) returns bool {
+persistent ghost reach(address, address) returns bool {
     init_state axiom forall address X. forall address Y. reach(X, Y) == (X == Y || to_mathint(Y) == 0);
 }
 
-ghost mapping(address => address) ghostOwners {
+persistent ghost mapping(address => address) ghostOwners {
     init_state axiom forall address X. to_mathint(ghostOwners[X]) == 0;
 }
 
-ghost ghostSuccCount(address) returns mathint {
+persistent ghost ghostSuccCount(address) returns mathint {
     init_state axiom forall address X. ghostSuccCount(X) == 0;
 }
 
-ghost uint256 ghostOwnerCount;
+persistent ghost uint256 ghostOwnerCount;
 
-ghost address SENTINEL {
+persistent ghost address SENTINEL {
     axiom to_mathint(SENTINEL) == 1;
 }
-ghost address NULL {
+
+persistent ghost address NULL {
     axiom to_mathint(NULL) == 0;
 }
 
@@ -201,7 +202,7 @@ definition updateGhostSuccCount(address key, mathint diff) returns bool = forall
 // hook to update the ghostOwners and the reach ghost state whenever the owners field
 // in storage is written.
 // This also checks that the reach_succ invariant is preserved.
-hook Sstore currentContract.owners[KEY address key] address value STORAGE {
+hook Sstore currentContract.owners[KEY address key] address value {
     address valueOrNull;
     address someKey;
     require reach_succ(someKey, ghostOwners[someKey]);
@@ -215,19 +216,19 @@ hook Sstore currentContract.owners[KEY address key] address value STORAGE {
     assert ghostSuccCount(someKey) == count_expected(someKey);
 }
 
-hook Sstore currentContract.ownerCount uint256 value STORAGE {
+hook Sstore currentContract.ownerCount uint256 value {
     ghostOwnerCount = value;
 }
 
 // Hook to match ghost state and storage state when reading owners from storage.
 // This also provides the reach_succ invariant.
-hook Sload address value currentContract.owners[KEY address key] STORAGE {
+hook Sload address value currentContract.owners[KEY address key] {
     require ghostOwners[key] == value;
     require reach_succ(key, value);
     require ghostSuccCount(key) == count_expected(key);
 }
 
-hook Sload uint256 value currentContract.ownerCount STORAGE {
+hook Sload uint256 value currentContract.ownerCount {
     // The prover found a counterexample if the owners count is max uint256,
     // but this is not a realistic scenario.
     require ghostOwnerCount < MAX_UINT256();

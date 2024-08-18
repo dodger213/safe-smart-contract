@@ -3,11 +3,11 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import {TokenCallbackHandler} from "./TokenCallbackHandler.sol";
 import {ISignatureValidator} from "../interfaces/ISignatureValidator.sol";
-import {Safe} from "../Safe.sol";
+import {ISafe} from "../interfaces/ISafe.sol";
 import {HandlerContext} from "./HandlerContext.sol";
 
 /**
- * @title Compatibility Fallback Handler - Provides compatibility between pre 1.3.0 and 1.3.0+ Safe contracts.
+ * @title Compatibility Fallback Handler - Provides compatibility between pre 1.3.0 and 1.3.0+ Safe Smart Account contracts.
  * @author Richard Meissner - @rmeissner
  */
 contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidator, HandlerContext {
@@ -24,7 +24,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
      * @return Message hash.
      */
     function getMessageHash(bytes memory message) public view returns (bytes32) {
-        return getMessageHashForSafe(Safe(payable(msg.sender)), message);
+        return getMessageHashForSafe(ISafe(payable(msg.sender)), message);
     }
 
     /**
@@ -33,7 +33,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
      * @param message Message that should be encoded.
      * @return Encoded message.
      */
-    function encodeMessageDataForSafe(Safe safe, bytes memory message) public view returns (bytes memory) {
+    function encodeMessageDataForSafe(ISafe safe, bytes memory message) public view returns (bytes memory) {
         bytes32 safeMessageHash = keccak256(abi.encode(SAFE_MSG_TYPEHASH, keccak256(message)));
         return abi.encodePacked(bytes1(0x19), bytes1(0x01), safe.domainSeparator(), safeMessageHash);
     }
@@ -44,7 +44,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
      * @param message Message that should be hashed.
      * @return Message hash.
      */
-    function getMessageHashForSafe(Safe safe, bytes memory message) public view returns (bytes32) {
+    function getMessageHashForSafe(ISafe safe, bytes memory message) public view returns (bytes32) {
         return keccak256(encodeMessageDataForSafe(safe, message));
     }
 
@@ -56,13 +56,13 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
      */
     function isValidSignature(bytes32 _dataHash, bytes calldata _signature) public view override returns (bytes4) {
         // Caller should be a Safe
-        Safe safe = Safe(payable(msg.sender));
+        ISafe safe = ISafe(payable(msg.sender));
         bytes memory messageData = encodeMessageDataForSafe(safe, abi.encode(_dataHash));
         bytes32 messageHash = keccak256(messageData);
         if (_signature.length == 0) {
             require(safe.signedMessages(messageHash) != 0, "Hash not approved");
         } else {
-            safe.checkSignatures(messageHash, messageData, _signature);
+            safe.checkSignatures(messageHash, _signature);
         }
         return EIP1271_MAGIC_VALUE;
     }
@@ -73,7 +73,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
      */
     function getModules() external view returns (address[] memory) {
         // Caller should be a Safe
-        Safe safe = Safe(payable(msg.sender));
+        ISafe safe = ISafe(payable(msg.sender));
         (address[] memory array, ) = safe.getModulesPaginated(SENTINEL_MODULES, 10);
         return array;
     }
@@ -97,12 +97,13 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
         /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
         assembly {
-            let internalCalldata := mload(0x40)
+            let ptr := mload(0x40)
             /**
              * Store `simulateAndRevert.selector`.
              * String representation is used to force right padding
              */
-            mstore(internalCalldata, "\xb4\xfa\xba\x09")
+            mstore(ptr, "\xb4\xfa\xba\x09")
+
             /**
              * Abuse the fact that both this and the internal methods have the
              * same signature, and differ only in symbol name (and therefore,
@@ -110,7 +111,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
              * 250 bytes of code and 300 gas at runtime over the
              * `abi.encodeWithSelector` builtin.
              */
-            calldatacopy(add(internalCalldata, 0x04), 0x04, sub(calldatasize(), 0x04))
+            calldatacopy(add(ptr, 0x04), 0x04, sub(calldatasize(), 0x04))
 
             /**
              * `pop` is required here by the compiler, as top level expressions
@@ -124,7 +125,7 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
                     // address() has been changed to caller() to use the implementation of the Safe
                     caller(),
                     0,
-                    internalCalldata,
+                    ptr,
                     calldatasize(),
                     /**
                      * The `simulateAndRevert` call always reverts, and
@@ -155,20 +156,5 @@ contract CompatibilityFallbackHandler is TokenCallbackHandler, ISignatureValidat
             }
         }
         /* solhint-enable no-inline-assembly */
-    }
-
-    /**
-     * @notice Checks whether the signature provided is valid for the provided data and hash. Reverts otherwise.
-     * @dev Since the EIP-1271 does an external call, be mindful of reentrancy attacks.
-     *      The function was moved to the fallback handler as a part of
-     *      1.5.0 contract upgrade. It used to be a part of the Safe core contract, but
-     *      was replaced by the same function that accepts the executor as a parameter.
-     * @param dataHash Hash of the data (could be either a message hash or transaction hash)
-     * @param signatures Signature data that should be verified.
-     *                   Can be packed ECDSA signature ({bytes32 r}{bytes32 s}{uint8 v}), contract signature (EIP-1271) or approved hash.
-     * @param requiredSignatures Amount of required valid signatures.
-     */
-    function checkNSignatures(bytes32 dataHash, bytes memory, bytes memory signatures, uint256 requiredSignatures) public view {
-        Safe(payable(_manager())).checkNSignatures(_msgSender(), dataHash, "", signatures, requiredSignatures);
     }
 }
