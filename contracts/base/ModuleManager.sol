@@ -281,6 +281,7 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
 
     /**
      * @notice A hook that gets called before execution of {execTransactionFromModule*} methods.
+
      * @param to Destination address of module transaction.
      * @param value Ether value of module transaction.
      * @param data Data payload of module transaction.
