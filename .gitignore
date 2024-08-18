@@ -12,3 +12,13 @@ solc
 coverage/
 coverage.json
 yarn-error.log
+typechain-types
+.vscode
+
+# Certora Formal Verification related files
+.certora_internal
+.certora_recent_jobs.json
+.zip-output-url.txt
+
+# Safe YUL code
+contracts/SafeBytecode.sol

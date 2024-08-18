@@ -47,4 +47,5 @@ export const getContractStorageLayout = async (
   }
 
   return stateVariables;
+
 };

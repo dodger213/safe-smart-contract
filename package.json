@@ -17,8 +17,10 @@
         "build": "hardhat compile",
         "build:ts": "rimraf dist && tsc -p tsconfig.prod.json",
         "build:ts:dev": "rimraf dist && tsc -p tsconfig.json",
+
         "test": "hardhat test",
         "test:parallel": "hardhat test --parallel",
+
         "coverage": "hardhat coverage",
         "codesize": "hardhat codesize",
         "benchmark": "npm run test benchmark/*.ts",
@@ -76,6 +78,7 @@
         "solhint": "^4.5.4",
         "ts-node": "^10.9.2",
         "typescript": "^5.4.5",
+
         "yargs": "^17.7.2"
     }
 }

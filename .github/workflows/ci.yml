@@ -1,5 +1,7 @@
-name: safe-contracts
-on: [push]
+name: safe-smart-account
+on: [push, pull_request]
+env:
+    NODE_VERSION: 20.16.0
 
 jobs:
   tests:
@@ -79,3 +81,4 @@ jobs:
           path: "**/node_modules"
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
       - run: (yarn --frozen-lockfile && yarn build && yarn hardhat codesize --contractname GnosisSafe && yarn benchmark) || echo "Benchmark failed"
+

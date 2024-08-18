@@ -26,16 +26,15 @@ const {
   SOLIDITY_SETTINGS,
 } = process.env;
 
-const DEFAULT_MNEMONIC =
-  "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
+const DEFAULT_MNEMONIC = "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
 
 const sharedNetworkConfig: HttpNetworkUserConfig = {};
 if (PK) {
-  sharedNetworkConfig.accounts = [PK];
+    sharedNetworkConfig.accounts = [PK];
 } else {
-  sharedNetworkConfig.accounts = {
-    mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
-  };
+    sharedNetworkConfig.accounts = {
+        mnemonic: MNEMONIC || DEFAULT_MNEMONIC,
+    };
 }
 
 if (
@@ -53,6 +52,7 @@ if (
   throw new Error(
     `Could not find Infura key in env, unable to connect to network ${argv.network}`,
   );
+
 }
 
 import "./src/tasks/local_verify";

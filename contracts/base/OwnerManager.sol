@@ -1,40 +1,47 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.7.0 <0.9.0;
-import "../common/SelfAuthorized.sol";
+import {SelfAuthorized} from "../common/SelfAuthorized.sol";
+import {IOwnerManager} from "../interfaces/IOwnerManager.sol";
 
-/// @title OwnerManager - Manages a set of owners and a threshold to perform actions.
-/// @author Stefan George - <stefan@gnosis.pm>
-/// @author Richard Meissner - <richard@gnosis.pm>
-contract OwnerManager is SelfAuthorized {
-    event AddedOwner(address owner);
-    event RemovedOwner(address owner);
-    event ChangedThreshold(uint256 threshold);
-
+/**
+ * @title OwnerManager - Manages Safe owners and a threshold to authorize transactions.
+ * @dev Uses a linked list to store the owners because the code generate by the solidity compiler
+ *      is more efficient than using a dynamic array.
+ * @author Stefan George - @Georgi87
+ * @author Richard Meissner - @rmeissner
+ */
+abstract contract OwnerManager is SelfAuthorized, IOwnerManager {
+    // SENTINEL_OWNERS is used to traverse `owners`, so that:
+    //      1. `owners[SENTINEL_OWNERS]` contains the first owner
+    //      2. `owners[last_owner]` points back to SENTINEL_OWNERS
     address internal constant SENTINEL_OWNERS = address(0x1);
 
     mapping(address => address) internal owners;
     uint256 internal ownerCount;
     uint256 internal threshold;
 
-    /// @dev Setup function sets initial storage of contract.
-    /// @param _owners List of Safe owners.
-    /// @param _threshold Number of required confirmations for a Safe transaction.
+    /**
+     * @notice Sets the initial storage of the contract.
+     * @param _owners List of Safe owners.
+     * @param _threshold Number of required confirmations for a Safe transaction.
+     */
     function setupOwners(address[] memory _owners, uint256 _threshold) internal {
         // Threshold can only be 0 at initialization.
         // Check ensures that setup function can only be called once.
-        require(threshold == 0, "GS200");
+        if (threshold > 0) revertWithError("GS200");
         // Validate that threshold is smaller than number of added owners.
-        require(_threshold <= _owners.length, "GS201");
+        if (_threshold > _owners.length) revertWithError("GS201");
         // There has to be at least one Safe owner.
-        require(_threshold >= 1, "GS202");
+        if (_threshold == 0) revertWithError("GS202");
         // Initializing Safe owners.
         address currentOwner = SENTINEL_OWNERS;
         for (uint256 i = 0; i < _owners.length; i++) {
             // Owner address cannot be null.
             address owner = _owners[i];
-            require(owner != address(0) && owner != SENTINEL_OWNERS && owner != address(this) && currentOwner != owner, "GS203");
+            if (owner == address(0) || owner == SENTINEL_OWNERS || owner == address(this) || currentOwner == owner)
+                revertWithError("GS203");
             // No duplicate owners allowed.
-            require(owners[owner] == address(0), "GS204");
+            if (owners[owner] != address(0)) revertWithError("GS204");
             owners[currentOwner] = owner;
             currentOwner = owner;
         }
@@ -43,16 +50,14 @@ contract OwnerManager is SelfAuthorized {
         threshold = _threshold;
     }
 
-    /// @dev Allows to add a new owner to the Safe and update the threshold at the same time.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Adds the owner `owner` to the Safe and updates the threshold to `_threshold`.
-    /// @param owner New owner address.
-    /// @param _threshold New threshold.
-    function addOwnerWithThreshold(address owner, uint256 _threshold) public authorized {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function addOwnerWithThreshold(address owner, uint256 _threshold) public override authorized {
         // Owner address cannot be null, the sentinel or the Safe itself.
-        require(owner != address(0) && owner != SENTINEL_OWNERS && owner != address(this), "GS203");
+        if (owner == address(0) || owner == SENTINEL_OWNERS || owner == address(this)) revertWithError("GS203");
         // No duplicate owners allowed.
-        require(owners[owner] == address(0), "GS204");
+        if (owners[owner] != address(0)) revertWithError("GS204");
         owners[owner] = owners[SENTINEL_OWNERS];
         owners[SENTINEL_OWNERS] = owner;
         ownerCount++;
@@ -61,22 +66,15 @@ contract OwnerManager is SelfAuthorized {
         if (threshold != _threshold) changeThreshold(_threshold);
     }
 
-    /// @dev Allows to remove an owner from the Safe and update the threshold at the same time.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Removes the owner `owner` from the Safe and updates the threshold to `_threshold`.
-    /// @param prevOwner Owner that pointed to the owner to be removed in the linked list
-    /// @param owner Owner address to be removed.
-    /// @param _threshold New threshold.
-    function removeOwner(
-        address prevOwner,
-        address owner,
-        uint256 _threshold
-    ) public authorized {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function removeOwner(address prevOwner, address owner, uint256 _threshold) public override authorized {
         // Only allow to remove an owner, if threshold can still be reached.
-        require(ownerCount - 1 >= _threshold, "GS201");
+        if (ownerCount - 1 < _threshold) revertWithError("GS201");
         // Validate owner address and check that it corresponds to owner index.
-        require(owner != address(0) && owner != SENTINEL_OWNERS, "GS203");
-        require(owners[prevOwner] == owner, "GS205");
+        if (owner == address(0) || owner == SENTINEL_OWNERS) revertWithError("GS203");
+        if (owners[prevOwner] != owner) revertWithError("GS205");
         owners[prevOwner] = owners[owner];
         owners[owner] = address(0);
         ownerCount--;
@@ -85,24 +83,17 @@ contract OwnerManager is SelfAuthorized {
         if (threshold != _threshold) changeThreshold(_threshold);
     }
 
-    /// @dev Allows to swap/replace an owner from the Safe with another address.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Replaces the owner `oldOwner` in the Safe with `newOwner`.
-    /// @param prevOwner Owner that pointed to the owner to be replaced in the linked list
-    /// @param oldOwner Owner address to be replaced.
-    /// @param newOwner New owner address.
-    function swapOwner(
-        address prevOwner,
-        address oldOwner,
-        address newOwner
-    ) public authorized {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function swapOwner(address prevOwner, address oldOwner, address newOwner) public override authorized {
         // Owner address cannot be null, the sentinel or the Safe itself.
-        require(newOwner != address(0) && newOwner != SENTINEL_OWNERS && newOwner != address(this), "GS203");
+        if (newOwner == address(0) || newOwner == SENTINEL_OWNERS || newOwner == address(this)) revertWithError("GS203");
         // No duplicate owners allowed.
-        require(owners[newOwner] == address(0), "GS204");
+        if (owners[newOwner] != address(0)) revertWithError("GS204");
         // Validate oldOwner address and check that it corresponds to owner index.
-        require(oldOwner != address(0) && oldOwner != SENTINEL_OWNERS, "GS203");
-        require(owners[prevOwner] == oldOwner, "GS205");
+        if (oldOwner == address(0) || oldOwner == SENTINEL_OWNERS) revertWithError("GS203");
+        if (owners[prevOwner] != oldOwner) revertWithError("GS205");
         owners[newOwner] = owners[oldOwner];
         owners[prevOwner] = newOwner;
         owners[oldOwner] = address(0);
@@ -110,30 +101,36 @@ contract OwnerManager is SelfAuthorized {
         emit AddedOwner(newOwner);
     }
 
-    /// @dev Allows to update the number of required confirmations by Safe owners.
-    ///      This can only be done via a Safe transaction.
-    /// @notice Changes the threshold of the Safe to `_threshold`.
-    /// @param _threshold New threshold.
-    function changeThreshold(uint256 _threshold) public authorized {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function changeThreshold(uint256 _threshold) public override authorized {
         // Validate that threshold is smaller than number of owners.
-        require(_threshold <= ownerCount, "GS201");
+        if (_threshold > ownerCount) revertWithError("GS201");
         // There has to be at least one Safe owner.
-        require(_threshold >= 1, "GS202");
+        if (_threshold == 0) revertWithError("GS202");
         threshold = _threshold;
         emit ChangedThreshold(threshold);
     }
 
-    function getThreshold() public view returns (uint256) {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function getThreshold() public view override returns (uint256) {
         return threshold;
     }
 
-    function isOwner(address owner) public view returns (bool) {
-        return owner != SENTINEL_OWNERS && owners[owner] != address(0);
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function isOwner(address owner) public view override returns (bool) {
+        return !(owner == SENTINEL_OWNERS || owners[owner] == address(0));
     }
 
-    /// @dev Returns array of owners.
-    /// @return Array of Safe owners.
-    function getOwners() public view returns (address[] memory) {
+    /**
+     * @inheritdoc IOwnerManager
+     */
+    function getOwners() public view override returns (address[] memory) {
         address[] memory array = new address[](ownerCount);
 
         // populate return array

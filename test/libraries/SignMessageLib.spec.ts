@@ -1,32 +1,35 @@
 import { expect } from "chai";
-import hre, { deployments, waffle } from "hardhat";
-import "@nomiclabs/hardhat-ethers";
-import { getSafeWithOwners } from "../utils/setup";
+import hre, { deployments, ethers } from "hardhat";
+import { getSafe } from "../utils/setup";
 import { executeContractCallWithSigners, calculateSafeMessageHash } from "../../src/utils/execution";
 import { chainId } from "../utils/encoding";
 
-describe("SignMessageLib", async () => {
-
-    const [user1, user2] = waffle.provider.getWallets()
-
+describe("SignMessageLib", () => {
     const setupTests = deployments.createFixture(async ({ deployments }) => {
         await deployments.fixture();
         const lib = await (await hre.ethers.getContractFactory("SignMessageLib")).deploy();
+        const signers = await ethers.getSigners();
+        const [user1, user2] = signers;
         return {
-            safe: await getSafeWithOwners([user1.address, user2.address]),
-            lib
-        }
-    })
+            safe: await getSafe({ owners: [user1.address, user2.address] }),
+            lib,
+            signers,
+        };
+    });
 
-    describe("signMessage", async () => {
+    describe("signMessage", () => {
+        it("can only if msg.sender provides domain separator", async () => {
+            const { lib } = await setupTests();
+            await expect(lib.signMessage("0xbaddad")).to.be.reverted;
+        });
 
-        it('can only if msg.sender provides domain separator', async () => {
-            const { lib } = await setupTests()
-            await expect(lib.signMessage("0xbaddad")).to.be.reverted
-        })
-
-        it('should emit event', async () => {
-            const { safe, lib } = await setupTests()
+        it("should emit event", async () => {
+            const {
+                safe,
+                lib,
+                signers: [user1, user2],
+            } = await setupTests();
+            const safeAddress = await safe.getAddress();
             // Required to check that the event was emitted from the right address
             const libSafe = lib.attach(safe.address)
             const messageHash = calculateSafeMessageHash(safe, "0xbaddad", await chainId())
@@ -92,3 +95,4 @@ describe("SignMessageLib", async () => {
         });
     })
 })
+
