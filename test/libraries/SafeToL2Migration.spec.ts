@@ -2,7 +2,6 @@ import { expect } from "chai";
 import hre, { ethers, deployments } from "hardhat";
 import { AddressZero } from "@ethersproject/constants";
 import { getSafe, getSafeSingletonAt, getMock } from "../utils/setup";
-
 import deploymentData from "../json/safeDeployment.json";
 import safeRuntimeBytecode from "../json/safeRuntimeBytecode.json";
 import {
@@ -88,6 +87,7 @@ describe("SafeToL2Migration library", () => {
         const safeToL2MigrationContract = await hre.ethers.getContractFactory("SafeToL2Migration");
         const migration = await safeToL2MigrationContract.deploy();
         return {
+
 
             safe111: await getSafe({ singleton: singleton111, owners: [user1.address] }),
             safe130: await getSafe({ singleton: singleton130, owners: [user1.address] }),
