@@ -162,7 +162,9 @@ export const getSafe = async (safe: GetSafeParameters) => {
     const template = await getSafeTemplateWithSingleton(singleton, saltNumber);
     await logGas(
         `Setup Safe with ${owners.length} owner(s)${fallbackHandler && fallbackHandler !== AddressZero ? " and fallback handler" : ""}`,
+
         template.setup(owners, threshold, to, data, fallbackHandler, AddressZero, 0, AddressZero),
+
         !logGasUsage,
     );
     return template;

@@ -14,6 +14,7 @@ describe("StorageAccessible", () => {
         };
     });
 
+
     describe("getStorage", () => {
         it("can read singleton", async () => {
             await setupTests();

@@ -78,6 +78,7 @@ describe("Safe", () => {
         });
 
         it("should throw for incoming eth with data", async () => {
+
             const {
                 safe,
                 signers: [user1],
@@ -85,6 +86,7 @@ describe("Safe", () => {
             const safeAddress = await safe.getAddress();
 
             await expect(user1.sendTransaction({ to: safeAddress, value: 23, data: "0xbaddad" })).to.be.reverted;
+
         });
     });
 });

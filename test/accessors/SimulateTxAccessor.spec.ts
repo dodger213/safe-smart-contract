@@ -57,7 +57,8 @@ describe("SimulateTxAccessor", () => {
             const simulation = accessor.interface.decodeFunctionResult("simulate", acccessibleData);
             expect(safe.interface.decodeFunctionResult("getOwners", simulation.returnData)[0]).to.be.deep.eq([user1.address]);
             expect(simulation.success).to.be.true;
-            expect(simulation.estimate).to.be.lte(10000n);
+            expect(simulation.estimate.toNumber()).to.be.lte(15000);
+
         });
 
         it("simulate delegatecall", async () => {

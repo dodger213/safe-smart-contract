@@ -12,7 +12,7 @@ describe("Upgrade from Safe 1.2.0", () => {
 
     // We migrate the Safe and run the verification tests
     const setupTests = deployments.createFixture(async ({ deployments }) => {
-        await deployments.fixture();
+        const { SafeFallbackHandler } = await deployments.fixture();
         const mock = await getMock();
         const mockAddress = await mock.getAddress();
         const [user1] = await ethers.getSigners();
@@ -39,6 +39,7 @@ describe("Upgrade from Safe 1.2.0", () => {
             migratedSafe: safe,
             mock,
             multiSend: await getMultiSend(),
+            handler: SafeFallbackHandler.address,
         };
     });
 
