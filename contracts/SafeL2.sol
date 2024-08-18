@@ -37,7 +37,6 @@ contract SafeL2 is Safe {
      * @inheritdoc Safe
      */
     function onBeforeExecTransaction(
-
         address to,
         uint256 value,
         bytes calldata data,
@@ -47,7 +46,9 @@ contract SafeL2 is Safe {
         uint256 gasPrice,
         address gasToken,
         address payable refundReceiver,
-        bytes memory signatures
+        bytes memory signatures,
+        bool /*success*/
+
     ) internal override {
         bytes memory additionalInfo;
         {
@@ -72,13 +73,8 @@ contract SafeL2 is Safe {
      * @inheritdoc ModuleManager
 
      */
-    function onBeforeExecTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        bytes memory /* context */
-    ) internal override {
+    function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal override {
+
         emit SafeModuleTransaction(msg.sender, to, value, data, operation);
 
     }

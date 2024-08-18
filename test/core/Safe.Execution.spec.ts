@@ -204,9 +204,13 @@ describe("Safe", () => {
             await user1.sendTransaction({ to: safeAddress, value: ethers.parseEther("1") });
             const userBalance = await hre.ethers.provider.getBalance(user2.address);
             expect(await hre.ethers.provider.getBalance(safeAddress)).to.be.eq(ethers.parseEther("1"));
-
-            const executedTx = await executeTx(safe, tx, [await safeApproveHash(user1, safe, tx, true)]);
-            await expect(executedTx).to.emit(safe, "ExecutionSuccess");
+            let executedTx: any;
+            await expect(
+                executeTx(safe, tx, [await safeApproveHash(user1, safe, tx, true)]).then((tx) => {
+                    executedTx = tx;
+                    return tx;
+                }),
+            ).to.emit(safe, "ExecutionSuccess");
 
             const receipt = await hre.ethers.provider.getTransactionReceipt(executedTx!.hash);
             const receiptLogs = receipt?.logs ?? [];

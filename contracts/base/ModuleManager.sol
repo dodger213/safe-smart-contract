@@ -172,18 +172,9 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) external override returns (bool success) {
-        success = _execTransactionFromModule(to, value, data, operation, "");
-    }
-
-    function _execTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        bytes calldata context
-    ) internal returns (bool success) {
-        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation, context);
+    ) public override returns (bool success) {
+        onBeforeExecTransactionFromModule(to, value, data, operation);
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
         success = execute(to, value, data, operation, type(uint256).max);
         postModuleExecution(guard, guardHash, success);
 
@@ -197,31 +188,10 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
         uint256 value,
         bytes memory data,
         Enum.Operation operation
-    ) external override returns (bool success, bytes memory returnData) {
-        (success, returnData) = _execTransactionFromModuleReturnData(to, value, data, operation, "");
-    }
+    ) public override returns (bool success, bytes memory returnData) {
+        onBeforeExecTransactionFromModule(to, value, data, operation);
+        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation);
 
-    /**
-     * @inheritdoc IModuleManager
-     */
-    function execTransactionFromModuleReturnData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        bytes calldata context
-    ) external override returns (bool success, bytes memory returnData) {
-        (success, returnData) = _execTransactionFromModuleReturnData(to, value, data, operation, context);
-    }
-
-    function _execTransactionFromModuleReturnData(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        bytes calldata context
-    ) internal returns (bool success, bytes memory returnData) {
-        (address guard, bytes32 guardHash) = preModuleExecution(to, value, data, operation, context);
         success = execute(to, value, data, operation, type(uint256).max);
         /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
@@ -331,17 +301,10 @@ abstract contract ModuleManager is SelfAuthorized, Executor, IModuleManager {
 
     /**
      * @notice A hook that gets called before execution of {execTransactionFromModule*} methods.
-
      * @param to Destination address of module transaction.
      * @param value Ether value of module transaction.
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction.
      */
-    function onBeforeExecTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation,
-        bytes calldata context
-    ) internal virtual {}
+    function onBeforeExecTransactionFromModule(address to, uint256 value, bytes memory data, Enum.Operation operation) internal virtual {}
 }
